@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Analytics & Reports - Glitch Cafe Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'monochrome-900': '#000000',
+              'monochrome-800': '#1E293B',
+              'monochrome-100': '#F1F5F9',
+              'monochrome-50': '#F8FAFC',
+              'monochrome-white': '#FFFFFF',
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
+    <style type="text/tailwindcss">
+      @layer base { body { @apply bg-monochrome-100 text-monochrome-900 font-sans antialiased; } }
+      @layer components {
+        .btn-primary { @apply bg-monochrome-900 text-monochrome-white px-4 py-2 rounded shadow hover:bg-monochrome-800 transition-colors cursor-pointer text-sm font-medium; }
+        .btn-outline { @apply border border-monochrome-900 text-monochrome-900 px-4 py-2 rounded hover:bg-monochrome-50 transition-colors cursor-pointer text-sm font-medium; }
+        .card { @apply bg-monochrome-white p-6 rounded-lg shadow-sm border border-gray-200; }
+      }
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: #F1F5F9; }
+      ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="./src/auth.js"></script>
+  </head>
+  <body class="flex h-screen overflow-hidden bg-[#f4f4f5] text-monochrome-900 font-sans relative">
+    
+    <div id="sidebar-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden lg:hidden" onclick="toggleSidebar()"></div>
+
+    <aside id="sidebar" class="w-64 bg-monochrome-white border-r border-gray-200 flex flex-col justify-between fixed lg:relative inset-y-0 left-0 z-50 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out">
+      <div>
+        <div class="h-16 flex items-center px-6 border-b border-gray-200">
+          <i data-lucide="coffee" class="h-6 w-6 mr-3"></i>
+          <h1 class="text-xl font-bold tracking-tight">GLITCH CAFE</h1>
+        </div>
+        <nav class="p-4 space-y-1">
+          <a href="index.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="layout-dashboard" class="h-5 w-5 mr-3"></i> Dashboard
+          </a>
+          <a href="orders.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="list-ordered" class="h-5 w-5 mr-3"></i> Live Orders / KDS
+          </a>
+          <a href="tables.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="grid-3x3" class="h-5 w-5 mr-3"></i> Table Management
+          </a>
+          <a href="menu.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="menu-square" class="h-5 w-5 mr-3"></i> Menu & Categories
+          </a>
+          <a href="inventory.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="package" class="h-5 w-5 mr-3"></i> Inventory
+          </a>
+          <a href="analytics.html" class="flex items-center px-4 py-3 bg-monochrome-50 text-monochrome-900 font-medium rounded-lg">
+            <i data-lucide="bar-chart-2" class="h-5 w-5 mr-3"></i> Analytics
+          </a>
+          <a href="billing.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="credit-card" class="h-5 w-5 mr-3"></i> Cashier & Billing
+          </a>
+          <a href="settings.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="settings" class="h-5 w-5 mr-3"></i> Settings
+          </a>
+        </nav>
+      </div>
+      <div class="p-4 border-t border-gray-200">
+        <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+          <i data-lucide="log-out" class="h-5 w-5 mr-3"></i> Logout
+        </a>
+      </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col overflow-hidden w-full">
+      
+      <!-- Top Header & Filters -->
+      <header class="bg-monochrome-white border-b border-gray-200 shrink-0 z-10">
+        <div class="h-16 flex items-center justify-between px-4 lg:px-8 border-b border-gray-100">
+          <div class="flex items-center">
+            <button class="lg:hidden mr-4 p-2 text-gray-600 hover:text-monochrome-900 focus:outline-none" onclick="toggleSidebar()">
+              <i data-lucide="menu" class="h-6 w-6"></i>
+            </button>
+            <h2 class="text-xl font-bold text-monochrome-900">Analytics & Performance Reports</h2>
+          </div>
+          <div class="flex items-center">
+            <button class="btn-primary flex items-center" onclick="alert('Exporting PDF...')">
+              <i data-lucide="download" class="h-4 w-4 mr-2"></i> Export Report
+            </button>
+          </div>
+        </div>
+        <div class="px-4 lg:px-8 py-3 flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0">
+          <div class="flex items-center space-x-2 overflow-x-auto no-scrollbar" id="date-filters">
+            <button class="filter-btn active px-4 py-1.5 rounded-full text-sm font-medium transition-colors bg-monochrome-900 text-white" onclick="setDateFilter('today', this)">Today</button>
+            <button class="filter-btn px-4 py-1.5 rounded-full text-sm font-medium transition-colors bg-monochrome-100 text-gray-600 hover:bg-gray-200" onclick="setDateFilter('yesterday', this)">Yesterday</button>
+            <button class="filter-btn px-4 py-1.5 rounded-full text-sm font-medium transition-colors bg-monochrome-100 text-gray-600 hover:bg-gray-200" onclick="setDateFilter('7d', this)">Last 7 Days</button>
+            <button class="filter-btn px-4 py-1.5 rounded-full text-sm font-medium transition-colors bg-monochrome-100 text-gray-600 hover:bg-gray-200" onclick="setDateFilter('30d', this)">Last 30 Days</button>
+            <button class="filter-btn px-4 py-1.5 rounded-full text-sm font-medium transition-colors bg-monochrome-100 text-gray-600 hover:bg-gray-200"><i data-lucide="calendar" class="h-3 w-3 inline mr-1"></i> Custom</button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Scrollable Analytics Content -->
+      <main class="flex-1 overflow-y-auto p-4 lg:p-8">
+        
+        <!-- 4 KPI Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div class="card bg-monochrome-900 text-white transform transition-transform hover:-translate-y-1">
+            <div class="flex justify-between items-start mb-2">
+              <h3 class="text-sm font-medium text-gray-400">Gross Revenue</h3>
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-green-500 text-white" id="stat-growth">+0%</span>
+            </div>
+            <p class="text-3xl font-bold" id="stat-revenue">₹0</p>
+          </div>
+          <div class="card transform transition-transform hover:-translate-y-1">
+            <h3 class="text-sm font-medium text-gray-500 mb-2">Total Orders Settled</h3>
+            <p class="text-3xl font-bold text-monochrome-900 flex items-baseline">
+              <span id="stat-settled">0</span> 
+              <span class="text-sm font-medium text-red-500 ml-3" id="stat-cancelled">(0 Cancelled)</span>
+            </p>
+          </div>
+          <div class="card transform transition-transform hover:-translate-y-1">
+            <h3 class="text-sm font-medium text-gray-500 mb-2">Average Order Value</h3>
+            <p class="text-3xl font-bold text-monochrome-900" id="stat-aov">₹0</p>
+          </div>
+          <div class="card transform transition-transform hover:-translate-y-1">
+            <h3 class="text-sm font-medium text-gray-500 mb-2">Avg. Prep Time</h3>
+            <p class="text-3xl font-bold text-monochrome-900" id="stat-prep">0 mins</p>
+          </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
+          <!-- Main Chart -->
+          <div class="card xl:col-span-2">
+            <h2 class="text-lg font-bold text-monochrome-900 mb-4">Revenue & Volume Trends</h2>
+            <div class="h-72 w-full">
+              <canvas id="revenueChart"></canvas>
+            </div>
+          </div>
+          <!-- Peak Hours Chart -->
+          <div class="card">
+            <h2 class="text-lg font-bold text-monochrome-900 mb-4">Peak Hourly Distribution</h2>
+            <div class="h-72 w-full">
+              <canvas id="peakChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Details Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          <!-- Top Selling Dishes -->
+          <div class="card">
+            <h2 class="text-lg font-bold text-monochrome-900 mb-4">Top-Selling Dishes</h2>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider">
+                    <th class="pb-3 font-medium w-12">Rank</th>
+                    <th class="pb-3 font-medium">Item Name</th>
+                    <th class="pb-3 font-medium text-right">Units</th>
+                    <th class="pb-3 font-medium text-right">Revenue</th>
+                  </tr>
+                </thead>
+                <tbody id="top-items-body" class="divide-y divide-gray-100">
+                  <!-- Populated by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Right Column: Payments & Rejections -->
+          <div class="space-y-6">
+            <div class="card">
+              <h2 class="text-lg font-bold text-monochrome-900 mb-4">Payment Methods</h2>
+              <div class="space-y-4">
+                <div class="flex flex-col">
+                  <div class="flex justify-between text-sm mb-1">
+                    <span class="font-medium text-gray-700">UPI</span>
+                    <span class="font-bold" id="pay-upi">0%</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-monochrome-900 h-2 rounded-full transition-all duration-500" id="bar-upi" style="width: 0%"></div>
+                  </div>
+                </div>
+                <div class="flex flex-col">
+                  <div class="flex justify-between text-sm mb-1">
+                    <span class="font-medium text-gray-700">Card</span>
+                    <span class="font-bold" id="pay-card">0%</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-gray-500 h-2 rounded-full transition-all duration-500" id="bar-card" style="width: 0%"></div>
+                  </div>
+                </div>
+                <div class="flex flex-col">
+                  <div class="flex justify-between text-sm mb-1">
+                    <span class="font-medium text-gray-700">Cash</span>
+                    <span class="font-bold" id="pay-cash">0%</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-gray-300 h-2 rounded-full transition-all duration-500" id="bar-cash" style="width: 0%"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h2 class="text-lg font-bold text-monochrome-900 mb-4">Order Cancellation Reasons</h2>
+              <div class="space-y-3" id="rejection-list">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </main>
+    </div>
+
+    <script>
+      lucide.createIcons();
+      window.toggleSidebar = () => {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        if (sidebar && backdrop) {
+          sidebar.classList.toggle('-translate-x-full');
+          backdrop.classList.toggle('hidden');
+        }
+      };
+    </script>
+    <script src="./src/analytics.js"></script>
+  </body>
+</html>

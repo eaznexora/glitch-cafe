@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard - Glitch Cafe Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'monochrome-900': '#000000',
+              'monochrome-800': '#1E293B',
+              'monochrome-100': '#F1F5F9',
+              'monochrome-50': '#F8FAFC',
+              'monochrome-white': '#FFFFFF',
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
+    <style type="text/tailwindcss">
+      @layer base { body { @apply bg-monochrome-100 text-monochrome-900 font-sans antialiased; } }
+      @layer components {
+        .btn-primary { @apply bg-monochrome-900 text-monochrome-white px-4 py-2 rounded shadow hover:bg-monochrome-800 transition-colors cursor-pointer; }
+        .btn-outline { @apply border border-monochrome-900 text-monochrome-900 px-4 py-2 rounded hover:bg-monochrome-50 transition-colors cursor-pointer; }
+        .card { @apply bg-monochrome-white p-6 rounded-lg shadow-sm border border-gray-200; }
+      }
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: #F1F5F9; }
+      ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <script src="./src/auth.js"></script>
+  </head>
+  <body class="flex h-screen overflow-hidden bg-monochrome-100 text-monochrome-900 font-sans relative">
+    
+    <div id="sidebar-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden lg:hidden" onclick="toggleSidebar()"></div>
+
+    <aside id="sidebar" class="w-64 bg-monochrome-white border-r border-gray-200 flex flex-col justify-between fixed lg:relative inset-y-0 left-0 z-50 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out">
+      <div>
+        <div class="h-16 flex items-center px-6 border-b border-gray-200">
+          <i data-lucide="coffee" class="h-6 w-6 mr-3"></i>
+          <h1 class="text-xl font-bold tracking-tight">GLITCH CAFE</h1>
+        </div>
+        <nav class="p-4 space-y-1">
+          <a href="index.html" class="flex items-center px-4 py-3 bg-monochrome-50 text-monochrome-900 font-medium rounded-lg">
+            <i data-lucide="layout-dashboard" class="h-5 w-5 mr-3"></i> Dashboard
+          </a>
+          <a href="orders.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="list-ordered" class="h-5 w-5 mr-3"></i> Live Orders / KDS
+          </a>
+          <a href="tables.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="grid-3x3" class="h-5 w-5 mr-3"></i> Table Management
+          </a>
+          <a href="menu.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="menu-square" class="h-5 w-5 mr-3"></i> Menu & Categories
+          </a>
+          <a href="inventory.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="package" class="h-5 w-5 mr-3"></i> Inventory
+          </a>
+          <a href="analytics.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="bar-chart-2" class="h-5 w-5 mr-3"></i> Analytics
+          </a>
+          <a href="billing.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="credit-card" class="h-5 w-5 mr-3"></i> Cashier & Billing
+          </a>
+          <a href="settings.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="settings" class="h-5 w-5 mr-3"></i> Settings
+          </a>
+        </nav>
+      </div>
+      <div class="p-4 border-t border-gray-200">
+        <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+          <i data-lucide="log-out" class="h-5 w-5 mr-3"></i> Logout
+        </a>
+      </div>
+    </aside>
+
+    <div id="dashboard-view" class="flex-1 flex flex-col overflow-hidden w-full">
+      <header class="h-16 bg-monochrome-white border-b border-gray-200 flex items-center justify-between px-4 lg:px-8 z-10 shrink-0">
+        <div class="flex items-center w-full lg:w-1/3">
+          <button class="lg:hidden mr-4 p-2 text-gray-600 hover:text-monochrome-900 focus:outline-none" onclick="toggleSidebar()">
+            <i data-lucide="menu" class="h-6 w-6"></i>
+          </button>
+          <div class="relative w-full max-w-md hidden sm:block">
+            <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400"></i>
+            <input type="text" placeholder="Search orders, tables..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-monochrome-900 focus:border-monochrome-900 text-sm">
+          </div>
+        </div>
+        <div class="flex items-center space-x-2 lg:space-x-4 overflow-x-auto no-scrollbar py-1">
+          <span class="hidden lg:block text-sm font-medium text-gray-600 mr-4">Main Branch</span>
+          <button class="btn-outline text-sm flex items-center whitespace-nowrap"><i data-lucide="download" class="h-4 w-4 lg:mr-2"></i><span class="hidden lg:inline">Export</span></button>
+          <a href="kds.html" class="btn-primary text-sm flex items-center whitespace-nowrap"><i data-lucide="monitor-play" class="h-4 w-4 lg:mr-2"></i><span class="hidden lg:inline">View KDS</span></a>
+          <button class="btn-primary text-sm flex items-center whitespace-nowrap"><i data-lucide="plus" class="h-4 w-4 lg:mr-1"></i><span class="hidden lg:inline">New Order</span></button>
+        </div>
+      </header>
+
+      <main class="flex-1 overflow-y-auto p-8">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 lg:gap-6 mb-8">
+          <div class="card bg-monochrome-900 text-monochrome-white transform transition-transform hover:-translate-y-1">
+            <h3 class="text-sm font-medium text-gray-300 mb-1">Today's Revenue</h3>
+            <p class="text-3xl font-bold" id="kpi-revenue">₹0</p>
+          </div>
+          <div class="card transform transition-transform hover:-translate-y-1">
+            <h3 class="text-sm font-medium text-gray-500 mb-1">Total Orders</h3>
+            <p class="text-3xl font-bold text-monochrome-900" id="kpi-orders">0</p>
+          </div>
+          <div class="card transform transition-transform hover:-translate-y-1">
+            <h3 class="text-sm font-medium text-gray-500 mb-1">Active Tables</h3>
+            <p class="text-3xl font-bold text-monochrome-900" id="kpi-tables">0 / 0</p>
+          </div>
+          <div class="card transform transition-transform hover:-translate-y-1">
+            <h3 class="text-sm font-medium text-gray-500 mb-1">Pending Tickets</h3>
+            <p class="text-3xl font-bold text-monochrome-900" id="kpi-pending">0</p>
+          </div>
+          <div class="card transform transition-transform hover:-translate-y-1">
+            <h3 class="text-sm font-medium text-gray-500 mb-1">Avg Order Value</h3>
+            <p class="text-3xl font-bold text-monochrome-900" id="kpi-aov">₹0</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div class="lg:col-span-2 space-y-8">
+            <div class="card">
+              <div class="flex items-center justify-between mb-6">
+                <h2 class="text-lg font-bold text-monochrome-900">Sales Analytics</h2>
+                <div class="flex bg-gray-100 p-1 rounded-lg">
+                  <button class="px-3 py-1 text-sm font-medium bg-white rounded shadow-sm">Today</button>
+                  <button class="px-3 py-1 text-sm font-medium text-gray-500 hover:text-monochrome-900">7D</button>
+                  <button class="px-3 py-1 text-sm font-medium text-gray-500 hover:text-monochrome-900">30D</button>
+                </div>
+              </div>
+              <div class="h-72 w-full">
+                <canvas id="salesChart"></canvas>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="flex items-center justify-between mb-6">
+                <h2 class="text-lg font-bold text-monochrome-900 flex items-center">
+                  <span class="w-2 h-2 rounded-full bg-monochrome-900 mr-2 animate-pulse"></span>
+                  Live Orders
+                </h2>
+                <a href="orders.html" class="text-sm font-medium text-gray-500 hover:text-monochrome-900">View All</a>
+              </div>
+              <div class="overflow-x-auto w-full">
+                <table class="w-full min-w-[600px] text-left border-collapse">
+                  <thead>
+                    <tr class="border-b border-gray-200 text-sm text-gray-500">
+                      <th class="pb-3 font-medium">Order No.</th>
+                      <th class="pb-3 font-medium">Table</th>
+                      <th class="pb-3 font-medium">Items</th>
+                      <th class="pb-3 font-medium">Total</th>
+                      <th class="pb-3 font-medium">Status</th>
+                      <th class="pb-3 font-medium text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="live-orders-body">
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-8">
+            <div class="card">
+              <h2 class="text-lg font-bold text-monochrome-900 mb-6">Sales by Category</h2>
+              <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center">
+                    <div class="w-8 h-8 rounded bg-gray-100 flex items-center justify-center mr-3">
+                      <i data-lucide="coffee" class="h-4 w-4 text-gray-600"></i>
+                    </div>
+                    <div>
+                      <p class="text-sm font-medium text-monochrome-900">Beverages</p>
+                      <p class="text-xs text-gray-500">45 items</p>
+                    </div>
+                  </div>
+                  <span class="text-sm font-bold">₹8,400</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center">
+                    <div class="w-8 h-8 rounded bg-gray-100 flex items-center justify-center mr-3">
+                      <i data-lucide="pizza" class="h-4 w-4 text-gray-600"></i>
+                    </div>
+                    <div>
+                      <p class="text-sm font-medium text-monochrome-900">Mains</p>
+                      <p class="text-xs text-gray-500">32 items</p>
+                    </div>
+                  </div>
+                  <span class="text-sm font-bold">₹14,200</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center">
+                    <div class="w-8 h-8 rounded bg-gray-100 flex items-center justify-center mr-3">
+                      <i data-lucide="croissant" class="h-4 w-4 text-gray-600"></i>
+                    </div>
+                    <div>
+                      <p class="text-sm font-medium text-monochrome-900">Desserts</p>
+                      <p class="text-xs text-gray-500">18 items</p>
+                    </div>
+                  </div>
+                  <span class="text-sm font-bold">₹4,500</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center">
+                    <div class="w-8 h-8 rounded bg-gray-100 flex items-center justify-center mr-3">
+                      <i data-lucide="utensils-crossed" class="h-4 w-4 text-gray-600"></i>
+                    </div>
+                    <div>
+                      <p class="text-sm font-medium text-monochrome-900">Starters</p>
+                      <p class="text-xs text-gray-500">24 items</p>
+                    </div>
+                  </div>
+                  <span class="text-sm font-bold">₹6,800</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h2 class="text-lg font-bold text-monochrome-900 mb-6">Payment Breakdown</h2>
+              <div class="space-y-4">
+                <div class="flex flex-col">
+                  <div class="flex justify-between text-sm mb-1">
+                    <span class="font-medium text-gray-700">UPI</span>
+                    <span class="font-bold">65%</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-monochrome-900 h-2 rounded-full" style="width: 65%"></div>
+                  </div>
+                </div>
+                <div class="flex flex-col">
+                  <div class="flex justify-between text-sm mb-1">
+                    <span class="font-medium text-gray-700">Card</span>
+                    <span class="font-bold">20%</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-monochrome-800 h-2 rounded-full" style="width: 20%"></div>
+                  </div>
+                </div>
+                <div class="flex flex-col">
+                  <div class="flex justify-between text-sm mb-1">
+                    <span class="font-medium text-gray-700">Cash</span>
+                    <span class="font-bold">15%</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-gray-400 h-2 rounded-full" style="width: 15%"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </main>
+    </div>
+    
+    <script>
+      lucide.createIcons();
+    </script>
+    <script src="./src/main.js"></script>
+  </body>
+</html>

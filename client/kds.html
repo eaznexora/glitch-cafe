@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kitchen Display System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'monochrome-900': '#000000',
+              'monochrome-800': '#1E293B',
+              'monochrome-100': '#F1F5F9',
+              'monochrome-50': '#F8FAFC',
+              'monochrome-white': '#FFFFFF',
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
+    <style type="text/tailwindcss">
+      @layer base { body { @apply bg-monochrome-100 text-monochrome-900 font-sans antialiased; } }
+      @layer components {
+        .btn-primary { @apply bg-monochrome-900 text-monochrome-white px-4 py-2 rounded shadow hover:bg-monochrome-800 transition-colors cursor-pointer; }
+        .btn-outline { @apply border border-monochrome-900 text-monochrome-900 px-4 py-2 rounded hover:bg-monochrome-50 transition-colors cursor-pointer; }
+      }
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <script src="./src/auth.js"></script>
+  </head>
+  <body class="flex h-screen overflow-hidden bg-[#f4f4f5] text-monochrome-900 font-sans">
+    
+    <div id="kds-view" class="flex-1 flex flex-col font-sans w-full">
+      <header class="h-16 bg-white border-b border-[#e4e4e7] flex items-center justify-between px-4 lg:px-6 shrink-0 shadow-sm">
+        <div class="flex items-center space-x-4 lg:space-x-6">
+          <a href="orders.html" class="btn-outline text-sm flex items-center px-3 py-1.5 lg:px-4 lg:py-2">
+            <i data-lucide="arrow-left" class="h-4 w-4 mr-1 lg:mr-2"></i> <span class="hidden sm:inline">Back</span>
+          </a>
+          <div class="hidden md:flex items-center space-x-4 border-l border-gray-200 pl-6">
+            <span class="text-sm font-medium text-gray-500">Pending: <strong class="text-black" id="kds-count-pending">0</strong></span>
+            <span class="text-sm font-medium text-gray-500">Preparing: <strong class="text-black" id="kds-count-preparing">0</strong></span>
+            <span class="text-sm font-medium text-gray-500">Ready: <strong class="text-black" id="kds-count-ready">0</strong></span>
+          </div>
+        </div>
+        <div class="flex items-center space-x-4 lg:space-x-6">
+          <button id="audio-toggle" class="text-gray-500 hover:text-black focus:outline-none" onclick="toggleAudio()">
+            <i data-lucide="volume-x" class="h-5 w-5 lg:h-6 lg:w-6" id="audio-icon"></i>
+          </button>
+          <div class="text-lg lg:text-xl font-bold tracking-tight text-[#09090b] min-w-[110px] text-right" id="kds-clock">
+            12:00:00 AM
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-1 overflow-y-auto p-4 md:p-6">
+        <div id="kds-ticket-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        </div>
+      </main>
+      
+      <div id="rejection-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[110] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+          <h3 class="text-lg font-bold mb-4 text-[#09090b]">Reject Order <span id="reject-order-no"></span></h3>
+          <div class="space-y-3 mb-6">
+            <button class="w-full text-left px-4 py-3 border border-[#e4e4e7] rounded hover:bg-gray-50 text-sm font-medium" onclick="submitRejection('Item Out of Stock')">Item Out of Stock</button>
+            <button class="w-full text-left px-4 py-3 border border-[#e4e4e7] rounded hover:bg-gray-50 text-sm font-medium" onclick="submitRejection('Kitchen at Peak Capacity')">Kitchen at Peak Capacity</button>
+            <button class="w-full text-left px-4 py-3 border border-[#e4e4e7] rounded hover:bg-gray-50 text-sm font-medium" onclick="submitRejection('Closing Soon')">Closing Soon</button>
+            <button class="w-full text-left px-4 py-3 border border-[#e4e4e7] rounded hover:bg-gray-50 text-sm font-medium" onclick="submitRejection('Custom Reason')">Custom Reason</button>
+          </div>
+          <button class="w-full btn-outline" onclick="closeRejectionModal()">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      lucide.createIcons();
+    </script>
+    <script src="./src/main.js"></script>
+  </body>
+</html>

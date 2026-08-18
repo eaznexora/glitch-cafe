@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Settings & Access - Glitch Cafe Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'monochrome-900': '#000000',
+              'monochrome-800': '#1E293B',
+              'monochrome-100': '#F1F5F9',
+              'monochrome-50': '#F8FAFC',
+              'monochrome-white': '#FFFFFF',
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
+    <style type="text/tailwindcss">
+      @layer base { body { @apply bg-monochrome-100 text-monochrome-900 font-sans antialiased; } }
+      @layer components {
+        .btn-primary { @apply bg-monochrome-900 text-monochrome-white px-4 py-2 rounded shadow hover:bg-monochrome-800 transition-colors cursor-pointer text-sm font-medium; }
+        .btn-outline { @apply border border-monochrome-900 text-monochrome-900 px-4 py-2 rounded hover:bg-monochrome-50 transition-colors cursor-pointer text-sm font-medium; }
+        .input-field { @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-monochrome-900 focus:border-monochrome-900 text-sm; }
+        .label-text { @apply block text-sm font-bold text-gray-700 mb-1.5; }
+        .card { @apply bg-monochrome-white p-6 rounded-lg shadow-sm border border-gray-200; }
+        .tab-btn { @apply px-6 py-3 font-medium text-sm transition-colors border-b-2 border-transparent text-gray-500 hover:text-black; }
+        .tab-btn.active { @apply border-monochrome-900 text-monochrome-900 font-bold; }
+      }
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: #F1F5F9; }
+      ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+      
+      /* Checkbox Custom styling */
+      .perm-checkbox { @apply w-4 h-4 text-monochrome-900 bg-gray-100 border-gray-300 rounded focus:ring-monochrome-900 cursor-pointer; }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="./src/auth.js"></script> <!-- LOAD AUTH FIRST -->
+  </head>
+  <body class="flex h-screen overflow-hidden bg-[#f4f4f5] text-monochrome-900 font-sans relative">
+    
+    <div id="sidebar-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden lg:hidden" onclick="toggleSidebar()"></div>
+
+    <aside id="sidebar" class="w-64 bg-monochrome-white border-r border-gray-200 flex flex-col justify-between fixed lg:relative inset-y-0 left-0 z-50 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out">
+      <div>
+        <div class="h-16 flex items-center px-6 border-b border-gray-200">
+          <i data-lucide="coffee" class="h-6 w-6 mr-3"></i>
+          <h1 class="text-xl font-bold tracking-tight">GLITCH CAFE</h1>
+        </div>
+        <nav class="p-4 space-y-1">
+          <a href="index.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="layout-dashboard" class="h-5 w-5 mr-3"></i> Dashboard
+          </a>
+          <a href="orders.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="list-ordered" class="h-5 w-5 mr-3"></i> Live Orders / KDS
+          </a>
+          <a href="tables.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="grid-3x3" class="h-5 w-5 mr-3"></i> Table Management
+          </a>
+          <a href="menu.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="menu-square" class="h-5 w-5 mr-3"></i> Menu & Categories
+          </a>
+          <a href="inventory.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="package" class="h-5 w-5 mr-3"></i> Inventory
+          </a>
+          <a href="analytics.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="bar-chart-2" class="h-5 w-5 mr-3"></i> Analytics
+          </a>
+          <a href="billing.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="credit-card" class="h-5 w-5 mr-3"></i> Cashier & Billing
+          </a>
+          <a href="settings.html" class="flex items-center px-4 py-3 bg-monochrome-50 text-monochrome-900 font-medium rounded-lg">
+            <i data-lucide="settings" class="h-5 w-5 mr-3"></i> Settings
+          </a>
+        </nav>
+      </div>
+      <div class="p-4 border-t border-gray-200">
+        <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+          <i data-lucide="log-out" class="h-5 w-5 mr-3"></i> Logout
+        </a>
+      </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col overflow-hidden w-full">
+      
+      <!-- Top Header & Tabs -->
+      <header class="bg-monochrome-white border-b border-gray-200 shrink-0 z-10">
+        <div class="h-16 flex items-center justify-between px-4 lg:px-8 border-b border-gray-100">
+          <div class="flex items-center">
+            <button class="lg:hidden mr-4 p-2 text-gray-600 hover:text-monochrome-900 focus:outline-none" onclick="toggleSidebar()">
+              <i data-lucide="menu" class="h-6 w-6"></i>
+            </button>
+            <h2 class="text-xl font-bold text-monochrome-900">Settings & Access Control</h2>
+          </div>
+          <!-- auth.js injects Role Switcher here -->
+          <div class="flex items-center">
+            <button class="btn-primary" onclick="alert('Save all configurations?');">Save Changes</button>
+          </div>
+        </div>
+        <div class="px-4 lg:px-8 flex overflow-x-auto no-scrollbar">
+          <button class="tab-btn active whitespace-nowrap" onclick="switchTab('staff-roles', this)">Staff & Role Permissions</button>
+          <button class="tab-btn whitespace-nowrap" onclick="switchTab('cafe-profile', this)">Cafe Profile & GST Details</button>
+          <button class="tab-btn whitespace-nowrap" onclick="switchTab('printer-config', this)">Printer Configuration</button>
+        </div>
+      </header>
+
+      <main class="flex-1 overflow-y-auto p-4 lg:p-8 bg-[#f4f4f5]">
+        
+        <!-- Tab 1: Staff & Roles -->
+        <div id="staff-roles" class="settings-tab">
+          <div class="flex justify-between items-center mb-4">
+            <div>
+              <h2 class="text-xl font-bold text-monochrome-900">Team Members</h2>
+              <p class="text-sm text-gray-500">Manage employee access levels and system permissions.</p>
+            </div>
+            <button class="btn-primary" onclick="openStaffModal()">+ Add Staff Member</button>
+          </div>
+
+          <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-gray-50 border-b border-gray-200 text-gray-500">
+                <tr>
+                  <th class="py-3 px-4 font-bold tracking-wider">Staff Name</th>
+                  <th class="py-3 px-4 font-bold tracking-wider">Role</th>
+                  <th class="py-3 px-4 font-bold tracking-wider hidden md:table-cell">Permissions</th>
+                  <th class="py-3 px-4 font-bold tracking-wider text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="staff-table-body" class="divide-y divide-gray-100">
+                <!-- Populated by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab 2: Cafe Profile -->
+        <div id="cafe-profile" class="settings-tab hidden max-w-3xl">
+          <h2 class="text-xl font-bold text-monochrome-900 mb-1">Business Identity</h2>
+          <p class="text-sm text-gray-500 mb-6">These details appear on your printed invoices and KDS.</p>
+          
+          <div class="card space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label class="label-text">Cafe/Restaurant Name</label>
+                <input type="text" class="input-field" value="Glitch Cafe" id="cafe-name">
+              </div>
+              <div>
+                <label class="label-text">Tax ID / GSTIN</label>
+                <input type="text" class="input-field" value="22AAAAA0000A1Z5" id="cafe-gst">
+              </div>
+              <div class="md:col-span-2">
+                <label class="label-text">Business Address</label>
+                <textarea class="input-field" rows="2" id="cafe-address">123 Web Dev Lane, Tech City, 10001</textarea>
+              </div>
+              <div>
+                <label class="label-text">Contact Number</label>
+                <input type="text" class="input-field" value="+91 98765 43210" id="cafe-phone">
+              </div>
+              <div>
+                <label class="label-text">Currency Symbol</label>
+                <input type="text" class="input-field bg-gray-50" value="₹" readonly>
+              </div>
+              <div class="md:col-span-2">
+                <label class="label-text">Invoice Footer Note</label>
+                <input type="text" class="input-field" value="Thank you for visiting! Have a glitch-free day." id="cafe-footer">
+              </div>
+            </div>
+            <div class="pt-4 border-t border-gray-100 flex justify-end">
+              <button class="btn-primary" onclick="alert('Profile Saved!')">Save Profile Details</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Printer Config -->
+        <div id="printer-config" class="settings-tab hidden max-w-3xl">
+          <div class="card text-center py-12">
+            <i data-lucide="printer" class="h-12 w-12 text-gray-300 mx-auto mb-4"></i>
+            <h3 class="text-lg font-bold text-gray-700">Printer Configuration</h3>
+            <p class="text-sm text-gray-500 mb-4">Manage ESC/POS Thermal Printers or Network IP Printers here.</p>
+            <p class="text-xs font-bold text-yellow-600 bg-yellow-50 inline-block px-3 py-1 rounded">Hardware configuration requires local POS agent running.</p>
+          </div>
+        </div>
+
+      </main>
+    </div>
+
+    <!-- Add / Edit Staff Modal -->
+    <div id="staff-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[110] flex items-center justify-center p-4 transition-opacity">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col max-h-full">
+        <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 rounded-t-xl">
+          <h3 class="text-lg font-bold text-monochrome-900" id="staff-modal-title">Add Staff Member</h3>
+          <button class="text-gray-400 hover:text-black" onclick="closeStaffModal()"><i data-lucide="x" class="h-5 w-5"></i></button>
+        </div>
+        
+        <div class="p-6 overflow-y-auto space-y-6">
+          <div class="grid grid-cols-2 gap-4">
+            <div class="col-span-2">
+              <label class="label-text">Full Name</label>
+              <input type="text" id="staff-name" class="input-field" placeholder="e.g. John Doe">
+            </div>
+            <div>
+              <label class="label-text">Username / Login ID</label>
+              <input type="text" id="staff-username" class="input-field" placeholder="e.g. john_d">
+            </div>
+            <div>
+              <label class="label-text">Role Preset</label>
+              <select id="staff-role-preset" class="input-field bg-gray-50" onchange="applyRolePreset(this.value)">
+                <option value="Admin">Admin</option>
+                <option value="Chef">Chef</option>
+                <option value="Cashier">Cashier</option>
+                <option value="Custom">Custom</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="border-t border-gray-200 pt-4">
+            <h4 class="label-text mb-3">Module Access Permissions</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3" id="permissions-container">
+              <!-- Checkboxes -->
+              <label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" value="dashboard" class="perm-checkbox" checked>
+                <span class="text-sm font-medium">Dashboard Overview</span>
+              </label>
+              <label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" value="live_orders" class="perm-checkbox" checked>
+                <span class="text-sm font-medium">Live Orders & KDS</span>
+              </label>
+              <label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" value="menu" class="perm-checkbox" checked>
+                <span class="text-sm font-medium">Menu & Inventory</span>
+              </label>
+              <label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" value="billing" class="perm-checkbox" checked>
+                <span class="text-sm font-medium">Cashier & Billing</span>
+              </label>
+              <label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" value="analytics" class="perm-checkbox" checked>
+                <span class="text-sm font-medium">Analytics & Reports</span>
+              </label>
+              <label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" value="settings" class="perm-checkbox" checked>
+                <span class="text-sm font-medium">Settings (Admin)</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-4 border-t border-gray-200 bg-gray-50 flex justify-end space-x-2 rounded-b-xl">
+          <button class="btn-outline" onclick="closeStaffModal()">Cancel</button>
+          <button class="btn-primary" onclick="saveStaffMember()">Save Roles</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      lucide.createIcons();
+      window.toggleSidebar = () => {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        if (sidebar && backdrop) {
+          sidebar.classList.toggle('-translate-x-full');
+          backdrop.classList.toggle('hidden');
+        }
+      };
+
+      function switchTab(tabId, btn) {
+        document.querySelectorAll('.settings-tab').forEach(t => t.classList.add('hidden'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabId).classList.remove('hidden');
+        btn.classList.add('active');
+      }
+    </script>
+    <script src="./src/settings.js"></script>
+  </body>
+</html>

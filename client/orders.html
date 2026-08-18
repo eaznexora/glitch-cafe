@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Live Orders - Glitch Cafe Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'monochrome-900': '#000000',
+              'monochrome-800': '#1E293B',
+              'monochrome-100': '#F1F5F9',
+              'monochrome-50': '#F8FAFC',
+              'monochrome-white': '#FFFFFF',
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
+    <style type="text/tailwindcss">
+      @layer base { body { @apply bg-monochrome-100 text-monochrome-900 font-sans antialiased; } }
+      @layer components {
+        .btn-primary { @apply bg-monochrome-900 text-monochrome-white px-4 py-2 rounded shadow hover:bg-monochrome-800 transition-colors cursor-pointer; }
+        .btn-outline { @apply border border-monochrome-900 text-monochrome-900 px-4 py-2 rounded hover:bg-monochrome-50 transition-colors cursor-pointer; }
+      }
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: #F1F5F9; }
+      ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="./src/auth.js"></script>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+  </head>
+  <body class="flex h-screen overflow-hidden bg-monochrome-100 text-monochrome-900 font-sans relative">
+    
+    <div id="sidebar-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden lg:hidden" onclick="toggleSidebar()"></div>
+
+    <aside id="sidebar" class="w-64 bg-monochrome-white border-r border-gray-200 flex flex-col justify-between fixed lg:relative inset-y-0 left-0 z-50 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out">
+      <div>
+        <div class="h-16 flex items-center px-6 border-b border-gray-200">
+          <i data-lucide="coffee" class="h-6 w-6 mr-3"></i>
+          <h1 class="text-xl font-bold tracking-tight">GLITCH CAFE</h1>
+        </div>
+        <nav class="p-4 space-y-1">
+          <a href="index.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="layout-dashboard" class="h-5 w-5 mr-3"></i> Dashboard
+          </a>
+          <a href="orders.html" class="flex items-center px-4 py-3 bg-monochrome-50 text-monochrome-900 font-medium rounded-lg">
+            <i data-lucide="list-ordered" class="h-5 w-5 mr-3"></i> Live Orders / KDS
+          </a>
+          <a href="tables.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="grid-3x3" class="h-5 w-5 mr-3"></i> Table Management
+          </a>
+          <a href="menu.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="menu-square" class="h-5 w-5 mr-3"></i> Menu & Categories
+          </a>
+          <a href="inventory.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="package" class="h-5 w-5 mr-3"></i> Inventory
+          </a>
+          <a href="analytics.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="bar-chart-2" class="h-5 w-5 mr-3"></i> Analytics
+          </a>
+          <a href="billing.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="credit-card" class="h-5 w-5 mr-3"></i> Cashier & Billing
+          </a>
+          <a href="settings.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="settings" class="h-5 w-5 mr-3"></i> Settings
+          </a>
+        </nav>
+      </div>
+      <div class="p-4 border-t border-gray-200">
+        <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+          <i data-lucide="log-out" class="h-5 w-5 mr-3"></i> Logout
+        </a>
+      </div>
+    </aside>
+
+    <div id="orders-view" class="flex-1 flex flex-col overflow-hidden w-full">
+      <header class="bg-monochrome-white border-b border-gray-200 shrink-0 z-10">
+        <div class="h-16 flex items-center justify-between px-4 lg:px-8 border-b border-gray-100">
+          <div class="flex items-center">
+            <button class="lg:hidden mr-4 p-2 text-gray-600 hover:text-monochrome-900 focus:outline-none" onclick="toggleSidebar()">
+              <i data-lucide="menu" class="h-6 w-6"></i>
+            </button>
+            <h2 class="text-xl font-bold text-monochrome-900">Live Orders & Kitchen Display</h2>
+          </div>
+          <div class="flex items-center space-x-4">
+            <a href="kds.html" class="btn-primary text-sm hidden sm:flex items-center"><i data-lucide="monitor-play" class="h-4 w-4 mr-2"></i>Chef KDS Screen</a>
+            <div class="flex items-center space-x-2 text-sm font-medium text-green-600">
+              <span class="w-2 h-2 rounded-full bg-green-600 animate-pulse"></span>
+              <span class="hidden sm:inline">Live Sync Connected</span>
+            </div>
+          </div>
+        </div>
+        <div class="px-4 lg:px-8 py-3 flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0">
+          <div class="flex items-center space-x-2 overflow-x-auto no-scrollbar">
+            <button class="orders-tab active px-4 py-1.5 rounded-full text-sm font-medium transition-colors bg-monochrome-900 text-white" onclick="setOrdersFilter('all', this)">All Orders <span id="orders-count-all" class="ml-1 opacity-80">(0)</span></button>
+            <button class="orders-tab px-4 py-1.5 rounded-full text-sm font-medium transition-colors bg-monochrome-100 text-gray-600 hover:bg-gray-200" onclick="setOrdersFilter('ongoing', this)">Ongoing <span id="orders-count-ongoing" class="ml-1 opacity-80">(0)</span></button>
+            <button class="orders-tab px-4 py-1.5 rounded-full text-sm font-medium transition-colors bg-monochrome-100 text-gray-600 hover:bg-gray-200" onclick="setOrdersFilter('completed', this)">Completed</button>
+            <button class="orders-tab px-4 py-1.5 rounded-full text-sm font-medium transition-colors bg-monochrome-100 text-gray-600 hover:bg-gray-200" onclick="setOrdersFilter('cancelled', this)">Cancelled / Rejected</button>
+          </div>
+          <div class="relative w-full sm:max-w-xs">
+            <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400"></i>
+            <input type="text" id="orders-search" placeholder="Search orders, tables, items..." oninput="filterOrders()" class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-monochrome-900 focus:border-monochrome-900 text-sm">
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-1 overflow-y-auto p-4 lg:p-8">
+        <div class="bg-monochrome-white rounded-lg shadow-sm border border-gray-200 overflow-hidden w-full">
+          <div class="overflow-x-auto w-full">
+            <table class="w-full min-w-[900px] text-left border-collapse">
+              <thead>
+                <tr class="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider">
+                  <th class="px-6 py-4 font-medium">Order ID & Time</th>
+                  <th class="px-6 py-4 font-medium">Table</th>
+                  <th class="px-6 py-4 font-medium">Items Ordered</th>
+                  <th class="px-6 py-4 font-medium">Amount & Payment</th>
+                  <th class="px-6 py-4 font-medium">Status</th>
+                  <th class="px-6 py-4 font-medium text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="master-orders-body" class="divide-y divide-gray-100">
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Rejection Modal -->
+    <div id="rejection-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[110] flex items-center justify-center p-4">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+        <h3 class="text-lg font-bold mb-4 text-[#09090b]">Reject Order <span id="reject-order-no"></span></h3>
+        <div class="space-y-3 mb-6">
+          <button class="w-full text-left px-4 py-3 border border-[#e4e4e7] rounded hover:bg-gray-50 text-sm font-medium" onclick="submitRejection('Item Out of Stock')">Item Out of Stock</button>
+          <button class="w-full text-left px-4 py-3 border border-[#e4e4e7] rounded hover:bg-gray-50 text-sm font-medium" onclick="submitRejection('Kitchen at Peak Capacity')">Kitchen at Peak Capacity</button>
+          <button class="w-full text-left px-4 py-3 border border-[#e4e4e7] rounded hover:bg-gray-50 text-sm font-medium" onclick="submitRejection('Closing Soon')">Closing Soon</button>
+          <button class="w-full text-left px-4 py-3 border border-[#e4e4e7] rounded hover:bg-gray-50 text-sm font-medium" onclick="submitRejection('Custom Reason')">Custom Reason</button>
+        </div>
+        <button class="w-full btn-outline" onclick="closeRejectionModal()">Cancel</button>
+      </div>
+    </div>
+
+    <div id="drawer-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-[115] hidden" onclick="closeOrderDrawer()"></div>
+    <div id="order-drawer" class="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-2xl z-[120] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col font-sans">
+      <div class="h-16 flex items-center justify-between px-6 border-b border-gray-200 shrink-0">
+        <h2 class="text-lg font-bold text-monochrome-900">Order Details</h2>
+        <button class="p-2 text-gray-500 hover:text-black rounded" onclick="closeOrderDrawer()">
+          <i data-lucide="x" class="h-5 w-5"></i>
+        </button>
+      </div>
+      <div class="flex-1 overflow-y-auto p-6" id="drawer-content"></div>
+      <div class="p-6 border-t border-gray-200 bg-gray-50 shrink-0" id="drawer-actions"></div>
+    </div>
+
+    <script>
+      lucide.createIcons();
+    </script>
+    <script src="./src/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventory - Glitch Cafe Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'monochrome-900': '#000000',
+              'monochrome-800': '#1E293B',
+              'monochrome-100': '#F1F5F9',
+              'monochrome-50': '#F8FAFC',
+              'monochrome-white': '#FFFFFF',
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
+    <style type="text/tailwindcss">
+      @layer base { body { @apply bg-monochrome-100 text-monochrome-900 font-sans antialiased; } }
+      @layer components {
+        .btn-primary { @apply bg-monochrome-900 text-monochrome-white px-4 py-2 rounded shadow hover:bg-monochrome-800 transition-colors cursor-pointer; }
+        .btn-outline { @apply border border-monochrome-900 text-monochrome-900 px-4 py-2 rounded hover:bg-monochrome-50 transition-colors cursor-pointer; }
+      }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="./src/auth.js"></script>
+  </head>
+  <body class="flex h-screen overflow-hidden bg-monochrome-100 text-monochrome-900 font-sans relative">
+    
+    <div id="sidebar-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden lg:hidden" onclick="toggleSidebar()"></div>
+
+    <aside id="sidebar" class="w-64 bg-monochrome-white border-r border-gray-200 flex flex-col justify-between fixed lg:relative inset-y-0 left-0 z-50 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out">
+      <div>
+        <div class="h-16 flex items-center px-6 border-b border-gray-200">
+          <i data-lucide="coffee" class="h-6 w-6 mr-3"></i>
+          <h1 class="text-xl font-bold tracking-tight">GLITCH CAFE</h1>
+        </div>
+        <nav class="p-4 space-y-1">
+          <a href="index.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="layout-dashboard" class="h-5 w-5 mr-3"></i> Dashboard
+          </a>
+          <a href="orders.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="list-ordered" class="h-5 w-5 mr-3"></i> Live Orders / KDS
+          </a>
+          <a href="tables.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="grid-3x3" class="h-5 w-5 mr-3"></i> Table Management
+          </a>
+          <a href="menu.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="menu-square" class="h-5 w-5 mr-3"></i> Menu & Categories
+          </a>
+          <a href="inventory.html" class="flex items-center px-4 py-3 bg-monochrome-50 text-monochrome-900 font-medium rounded-lg">
+            <i data-lucide="package" class="h-5 w-5 mr-3"></i> Inventory
+          </a>
+          <a href="analytics.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="bar-chart-2" class="h-5 w-5 mr-3"></i> Analytics
+          </a>
+          <a href="billing.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="credit-card" class="h-5 w-5 mr-3"></i> Cashier & Billing
+          </a>
+          <a href="settings.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="settings" class="h-5 w-5 mr-3"></i> Settings
+          </a>
+        </nav>
+      </div>
+      <div class="p-4 border-t border-gray-200">
+        <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+          <i data-lucide="log-out" class="h-5 w-5 mr-3"></i> Logout
+        </a>
+      </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col overflow-hidden w-full">
+      <header class="h-16 bg-monochrome-white border-b border-gray-200 flex items-center justify-between px-4 lg:px-8 shrink-0">
+        <div class="flex items-center">
+          <button class="lg:hidden mr-4 p-2 text-gray-600 hover:text-monochrome-900 focus:outline-none" onclick="toggleSidebar()">
+            <i data-lucide="menu" class="h-6 w-6"></i>
+          </button>
+          <h2 class="text-xl font-bold text-monochrome-900">Inventory Tracking</h2>
+        </div>
+      </header>
+
+      <main class="flex-1 overflow-y-auto p-4 lg:p-8 flex items-center justify-center">
+        <div class="bg-monochrome-white p-12 rounded-xl shadow-sm border border-gray-200 text-center max-w-md w-full">
+          <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6 border border-gray-100">
+            <i data-lucide="package-search" class="h-8 w-8 text-monochrome-900"></i>
+          </div>
+          <h3 class="text-2xl font-bold text-monochrome-900 mb-4">Feature Unavailable</h3>
+          <p class="text-gray-600 mb-8 leading-relaxed">
+            This feature is not available at this moment.<br>
+            Please contact <strong>Eaz Nexora</strong> to enable automated raw material & stock inventory tracking.
+          </p>
+          <a href="#" class="btn-primary w-full inline-flex justify-center items-center py-3 text-sm font-medium">
+            Contact Eaz Nexora <i data-lucide="external-link" class="h-4 w-4 ml-2"></i>
+          </a>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      lucide.createIcons();
+      window.toggleSidebar = () => {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        if (sidebar && backdrop) {
+          sidebar.classList.toggle('-translate-x-full');
+          backdrop.classList.toggle('hidden');
+        }
+      };
+    </script>
+  </body>
+</html>

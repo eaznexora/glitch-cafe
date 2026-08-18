@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cashier & Billing - Glitch Cafe Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'monochrome-900': '#000000',
+              'monochrome-800': '#1E293B',
+              'monochrome-100': '#F1F5F9',
+              'monochrome-50': '#F8FAFC',
+              'monochrome-white': '#FFFFFF',
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
+    <style type="text/tailwindcss">
+      @layer base { body { @apply bg-monochrome-100 text-monochrome-900 font-sans antialiased; } }
+      @layer components {
+        .btn-primary { @apply bg-monochrome-900 text-monochrome-white px-4 py-2 rounded shadow hover:bg-monochrome-800 transition-colors cursor-pointer text-sm font-medium; }
+        .btn-outline { @apply border border-monochrome-900 text-monochrome-900 px-4 py-2 rounded hover:bg-monochrome-50 transition-colors cursor-pointer text-sm font-medium; }
+        .input-field { @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-monochrome-900 focus:border-monochrome-900 text-sm; }
+        .card { @apply bg-monochrome-white p-4 rounded-lg shadow-sm border border-gray-200 cursor-pointer hover:border-gray-400 transition-colors flex flex-col h-full; }
+      }
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: #F1F5F9; }
+      ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+      /* Print Styles */
+      @media print {
+        body * { visibility: hidden; }
+        #print-invoice, #print-invoice * { visibility: visible; }
+        #print-invoice { position: absolute; left: 0; top: 0; width: 100%; max-width: 300px; padding: 0; margin: 0; } /* Thermal receipt size approx */
+        .no-print { display: none !important; }
+      }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="./src/auth.js"></script>
+  </head>
+  <body class="flex h-screen overflow-hidden bg-[#f4f4f5] text-monochrome-900 font-sans relative">
+    
+    <div id="sidebar-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden lg:hidden no-print" onclick="toggleSidebar()"></div>
+
+    <aside id="sidebar" class="no-print w-64 bg-monochrome-white border-r border-gray-200 flex flex-col justify-between fixed lg:relative inset-y-0 left-0 z-50 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out">
+      <div>
+        <div class="h-16 flex items-center px-6 border-b border-gray-200">
+          <i data-lucide="coffee" class="h-6 w-6 mr-3"></i>
+          <h1 class="text-xl font-bold tracking-tight">GLITCH CAFE</h1>
+        </div>
+        <nav class="p-4 space-y-1">
+          <a href="index.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="layout-dashboard" class="h-5 w-5 mr-3"></i> Dashboard
+          </a>
+          <a href="orders.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="list-ordered" class="h-5 w-5 mr-3"></i> Live Orders / KDS
+          </a>
+          <a href="tables.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="grid-3x3" class="h-5 w-5 mr-3"></i> Table Management
+          </a>
+          <a href="menu.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="menu-square" class="h-5 w-5 mr-3"></i> Menu & Categories
+          </a>
+          <a href="inventory.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="package" class="h-5 w-5 mr-3"></i> Inventory
+          </a>
+          <a href="analytics.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="bar-chart-2" class="h-5 w-5 mr-3"></i> Analytics
+          </a>
+          <a href="billing.html" class="flex items-center px-4 py-3 bg-monochrome-50 text-monochrome-900 font-medium rounded-lg">
+            <i data-lucide="credit-card" class="h-5 w-5 mr-3"></i> Cashier & Billing
+          </a>
+          <a href="settings.html" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+            <i data-lucide="settings" class="h-5 w-5 mr-3"></i> Settings
+          </a>
+        </nav>
+      </div>
+      <div class="p-4 border-t border-gray-200">
+        <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-monochrome-50 hover:text-monochrome-900 font-medium rounded-lg transition-colors">
+          <i data-lucide="log-out" class="h-5 w-5 mr-3"></i> Logout
+        </a>
+      </div>
+    </aside>
+
+    <div class="no-print flex-1 flex flex-col overflow-hidden w-full">
+      
+      <!-- Top Header & Filters -->
+      <header class="bg-monochrome-white border-b border-gray-200 shrink-0 z-10">
+        <div class="h-16 flex items-center justify-between px-4 lg:px-8 border-b border-gray-100">
+          <div class="flex items-center">
+            <button class="lg:hidden mr-4 p-2 text-gray-600 hover:text-monochrome-900 focus:outline-none" onclick="toggleSidebar()">
+              <i data-lucide="menu" class="h-6 w-6"></i>
+            </button>
+            <h2 class="text-xl font-bold text-monochrome-900">Cashier & Billing Settlement</h2>
+          </div>
+          <div class="flex items-center">
+            <button class="btn-primary flex items-center">
+              <i data-lucide="plus" class="h-4 w-4 mr-2"></i> Create Manual POS Bill
+            </button>
+          </div>
+        </div>
+        <div class="px-4 lg:px-8 py-3 flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0">
+          <div class="relative w-full max-w-md">
+            <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400"></i>
+            <input type="text" id="bill-search" oninput="filterBills()" placeholder="Search by Table #, Order #, or Name..." class="input-field pl-10 bg-gray-50">
+          </div>
+          <div class="flex items-center space-x-2 overflow-x-auto no-scrollbar" id="status-filters">
+            <button class="filter-btn active px-4 py-1.5 rounded-full text-sm font-medium transition-colors bg-monochrome-900 text-white" onclick="setStatusFilter('all', this)">All Bills</button>
+            <button class="filter-btn px-4 py-1.5 rounded-full text-sm font-medium transition-colors bg-monochrome-100 text-gray-600 hover:bg-gray-200" onclick="setStatusFilter('unpaid', this)">Pending Payment <span id="unpaid-badge" class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-200 text-gray-700">0</span></button>
+            <button class="filter-btn px-4 py-1.5 rounded-full text-sm font-medium transition-colors bg-monochrome-100 text-gray-600 hover:bg-gray-200" onclick="setStatusFilter('paid', this)">Paid & Settled</button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Billing Cards Grid -->
+      <main class="flex-1 overflow-y-auto p-4 lg:p-8 bg-[#f4f4f5]">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="bills-grid">
+          <!-- Populated by JS -->
+          <div class="col-span-full text-center py-12 text-gray-500">Loading bills...</div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Detailed Order Drawer (Slide-Over) -->
+    <div id="drawer-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-[100] hidden no-print transition-opacity" onclick="closeDrawer()"></div>
+    <div id="bill-drawer" class="fixed inset-y-0 right-0 w-full md:w-[480px] bg-white shadow-2xl z-[110] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col no-print">
+      
+      <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-monochrome-900 text-white">
+        <h3 class="text-lg font-bold" id="drawer-title">Bill Details</h3>
+        <button class="text-gray-300 hover:text-white" onclick="closeDrawer()"><i data-lucide="x" class="h-6 w-6"></i></button>
+      </div>
+      
+      <div class="flex-1 overflow-y-auto p-6 bg-gray-50">
+        
+        <!-- Drawer Header Info -->
+        <div class="flex justify-between items-start mb-6 pb-6 border-b border-gray-200">
+          <div>
+            <div class="font-bold text-2xl text-monochrome-900 mb-1" id="drawer-table">Table --</div>
+            <div class="text-sm text-gray-500" id="drawer-id">#INV-------</div>
+            <div class="text-sm text-gray-500 mt-1"><i data-lucide="user" class="inline h-3 w-3 mr-1"></i> <span id="drawer-customer">Walk-in Guest</span></div>
+          </div>
+          <div class="text-right">
+            <div class="" id="drawer-badge-container"></div>
+            <div class="text-xs text-gray-500 mt-2" id="drawer-time">--:-- --</div>
+          </div>
+        </div>
+
+        <!-- Itemized List -->
+        <h4 class="font-bold text-sm text-gray-700 uppercase tracking-wider mb-3">Order Items</h4>
+        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-gray-50 border-b border-gray-200 text-gray-500">
+              <tr>
+                <th class="py-2 px-3 font-medium">Item</th>
+                <th class="py-2 px-3 font-medium text-center">Qty</th>
+                <th class="py-2 px-3 font-medium text-right">Price</th>
+                <th class="py-2 px-3 font-medium text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody id="drawer-items" class="divide-y divide-gray-100">
+              <!-- JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Financials -->
+        <div class="bg-white rounded-lg border border-gray-200 p-4 space-y-2 mb-6">
+          <div class="flex justify-between text-sm text-gray-600">
+            <span>Subtotal</span>
+            <span id="drawer-subtotal">₹0.00</span>
+          </div>
+          <div class="flex justify-between text-sm text-gray-600 pb-2 border-b border-gray-100">
+            <span>GST (5%)</span>
+            <span id="drawer-gst">₹0.00</span>
+          </div>
+          <div class="flex justify-between text-lg font-bold text-monochrome-900 pt-1">
+            <span>Grand Total</span>
+            <span id="drawer-total">₹0.00</span>
+          </div>
+        </div>
+
+        <!-- Payment Actions (Shown if Unpaid) -->
+        <div id="drawer-payment-section" class="mb-6">
+          <h4 class="font-bold text-sm text-gray-700 uppercase tracking-wider mb-3">Collect Payment</h4>
+          <div class="grid grid-cols-3 gap-2 mb-4">
+            <button class="pay-method-btn border-2 border-gray-200 rounded-lg py-3 flex flex-col items-center justify-center hover:border-black transition-colors" data-method="UPI">
+              <i data-lucide="qr-code" class="h-6 w-6 mb-1 text-monochrome-900"></i>
+              <span class="text-xs font-bold">UPI / QR</span>
+            </button>
+            <button class="pay-method-btn border-2 border-gray-200 rounded-lg py-3 flex flex-col items-center justify-center hover:border-black transition-colors" data-method="CASH">
+              <i data-lucide="banknote" class="h-6 w-6 mb-1 text-monochrome-900"></i>
+              <span class="text-xs font-bold">Cash</span>
+            </button>
+            <button class="pay-method-btn border-2 border-gray-200 rounded-lg py-3 flex flex-col items-center justify-center hover:border-black transition-colors" data-method="CARD">
+              <i data-lucide="credit-card" class="h-6 w-6 mb-1 text-monochrome-900"></i>
+              <span class="text-xs font-bold">Card / POS</span>
+            </button>
+          </div>
+          <input type="hidden" id="selected-payment-method" value="">
+          <button class="btn-primary w-full py-3 text-base flex justify-center items-center" id="settle-btn" onclick="settleBill()">
+            <i data-lucide="check-circle" class="h-5 w-5 mr-2"></i> Mark as Paid & Settle
+          </button>
+        </div>
+
+      </div>
+      
+      <div class="p-4 border-t border-gray-200 bg-white flex space-x-3">
+        <button class="btn-outline flex-1 flex justify-center items-center" onclick="printInvoicePDF()">
+          <i data-lucide="file-down" class="h-4 w-4 mr-2"></i> Download PDF
+        </button>
+        <button class="btn-primary flex-1 flex justify-center items-center bg-gray-800" onclick="printInvoiceThermal()">
+          <i data-lucide="printer" class="h-4 w-4 mr-2"></i> Print Receipt
+        </button>
+      </div>
+    </div>
+
+    <!-- Hidden Thermal Print Template -->
+    <div id="print-invoice" class="hidden text-black bg-white font-sans text-sm">
+      <div style="text-align: center; border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px;">
+        <h2 style="font-size: 20px; font-weight: bold; margin: 0 0 5px 0;">GLITCH CAFE</h2>
+        <p style="margin: 0; font-size: 12px;">123 Web Dev Lane, Tech City</p>
+        <p style="margin: 0; font-size: 12px;">GSTIN: 22AAAAA0000A1Z5</p>
+      </div>
+      
+      <div style="border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px; font-size: 12px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+          <span>Bill No: <strong id="print-bill-no">---</strong></span>
+          <span id="print-date">---</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span id="print-table">Table: ---</span>
+          <span id="print-time">---</span>
+        </div>
+      </div>
+
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 12px;">
+        <thead>
+          <tr style="border-bottom: 1px dashed #000;">
+            <th style="text-align: left; padding: 4px 0;">Item</th>
+            <th style="text-align: center; padding: 4px 0;">Qty</th>
+            <th style="text-align: right; padding: 4px 0;">Amt</th>
+          </tr>
+        </thead>
+        <tbody id="print-items">
+          <!-- JS -->
+        </tbody>
+      </table>
+
+      <div style="border-top: 1px dashed #000; padding-top: 10px; font-size: 12px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+          <span>Subtotal:</span>
+          <span id="print-subtotal">₹0.00</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+          <span>CGST (2.5%):</span>
+          <span id="print-cgst">₹0.00</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+          <span>SGST (2.5%):</span>
+          <span id="print-sgst">₹0.00</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 16px; border-top: 1px dashed #000; padding-top: 5px; margin-top: 5px;">
+          <span>Total:</span>
+          <span id="print-total">₹0.00</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 12px; margin-top: 5px;">
+          <span>Status:</span>
+          <span id="print-status">UNPAID</span>
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-top: 15px; font-size: 12px; border-top: 1px dashed #000; padding-top: 15px;">
+        <p style="margin: 0; font-weight: bold;">Thank you for visiting!</p>
+        <p style="margin: 3px 0 0 0;">Have a glitch-free day.</p>
+      </div>
+    </div>
+
+    <script>
+      lucide.createIcons();
+      window.toggleSidebar = () => {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        if (sidebar && backdrop) {
+          sidebar.classList.toggle('-translate-x-full');
+          backdrop.classList.toggle('hidden');
+        }
+      };
+    </script>
+    <script src="./src/billing.js"></script>
+  </body>
+</html>
