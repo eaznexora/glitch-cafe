@@ -27,7 +27,9 @@ app.use((req, res, next) => {
 
 const apiRoutes = require('./routes/api');
 const authRoutes = require('./routes/auth');
+const customerAuthRoutes = require('./routes/customerAuth');
 app.use('/api/auth', authRoutes);
+app.use('/api/customer', customerAuthRoutes);
 app.use('/api', apiRoutes);
 
 // Standard JSON error handling middleware

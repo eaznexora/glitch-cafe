@@ -69,9 +69,18 @@
 
       <!-- Welcome -->
       <section id="customer-hero" class="w-full px-5 pt-4 pb-2 bg-[#fbfbfa]">
-        <div class="text-left">
-          <h2 class="text-[22px] font-bold tracking-tight">Hello, <span id="header-name">Adnan</span>!</h2>
-          <p class="text-sm font-bold text-brand-black mt-0.5" id="header-greeting">Good Morning</p>
+        <div class="flex justify-between items-start">
+          <div class="text-left">
+            <h2 class="text-[22px] font-bold tracking-tight">Hello, <span id="header-name">Adnan</span>!</h2>
+            <p class="text-sm font-bold text-brand-black mt-0.5" id="header-greeting">Good Morning</p>
+          </div>
+          <div class="text-center flex flex-col items-center">
+            <span class="text-[10px] font-bold text-gray-500 mb-1">Follow Us On</span>
+            <button class="flex items-center gap-1.5 px-3 py-1 bg-white border border-gray-200 rounded-full shadow-sm text-xs font-bold hover:bg-gray-50">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="url(#instagram-grad)"><defs><linearGradient id="instagram-grad" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#FFDC80"/><stop offset="50%" stop-color="#F56040"/><stop offset="100%" stop-color="#C13584"/></linearGradient></defs><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+              Instagram
+            </button>
+          </div>
         </div>
       </section>
 
@@ -148,6 +157,97 @@
         </div>
       </div>
     </div>
+
+  <!-- Floating View Order Bottom Bar -->
+  <div 
+    id="floating-cart-bar" 
+    class="fixed bottom-0 left-0 right-0 z-40 bg-white rounded-t-[20px] shadow-[0_-8px_24px_rgba(0,0,0,0.08)] border-t border-gray-100 p-4 pb-6 pointer-events-none transition-all duration-300 transform translate-y-full opacity-0"
+  >
+    <div class="max-w-md mx-auto pointer-events-auto">
+      <button 
+        id="btn-view-order" 
+        class="w-full bg-black text-white font-medium py-3.5 px-6 rounded-xl flex items-center justify-center gap-2 hover:bg-neutral-900 active:scale-[0.98] transition-all"
+      >
+        <span class="text-[15px] font-semibold">View Order</span>
+        <span id="floating-cart-count" class="text-[15px] font-semibold">
+          (0 items)
+        </span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Cart / Checkout Drawer -->
+  <div id="cart-drawer-backdrop" class="fixed inset-0 bg-black/60 z-50 transition-opacity duration-300 opacity-0 hidden"></div>
+  <div id="cart-drawer" class="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[24px] shadow-2xl max-w-md mx-auto transition-transform duration-300 transform translate-y-full max-h-[90vh] flex flex-col hidden">
+    <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-white rounded-t-[24px] shrink-0">
+      <h3 class="text-xl font-extrabold text-black">Your Order</h3>
+      <button id="close-cart-drawer" class="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full text-gray-500 hover:text-black hover:bg-gray-200 transition-colors">
+        <i data-lucide="x" class="h-4 w-4"></i>
+      </button>
+    </div>
+    <div id="cart-items-container" class="p-4 overflow-y-auto flex-1 space-y-4">
+      <!-- Cart items will be dynamically injected here -->
+    </div>
+    <div class="p-4 border-t border-gray-100 bg-white shrink-0">
+      <div class="flex justify-between items-center mb-4">
+        <span class="text-gray-600 font-medium">Subtotal</span>
+        <span id="cart-subtotal-display" class="font-bold text-lg">₹0</span>
+      </div>
+      <button id="btn-place-order" class="w-full bg-black text-white font-bold py-3.5 px-6 rounded-2xl shadow-xl hover:bg-neutral-900 active:scale-[0.98] transition-all flex justify-between items-center">
+        <span>Place Order</span>
+        <i data-lucide="arrow-right" class="h-5 w-5"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Customer Auth Modal -->
+  <div id="customer-auth-backdrop" class="fixed inset-0 z-[9998] backdrop-blur-md bg-black/40 opacity-0 pointer-events-none transition-opacity duration-300 ease-out hidden"></div>
+  <div id="customer-auth-modal" class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] p-6 shadow-2xl z-[9999] transform translate-y-full transition-transform duration-300 ease-out hidden">
+    <button id="btn-close-auth" class="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full text-gray-500 hover:text-black hover:bg-gray-200 transition-colors">
+      <i data-lucide="x" class="h-4 w-4"></i>
+    </button>
+    
+    <div id="auth-step-1">
+      <h3 class="text-2xl font-extrabold text-black mb-1">Welcome to The Glitch Cafe</h3>
+      <p class="text-sm text-gray-500 mb-6 font-medium">Enter your details to track your order and get exclusive perks.</p>
+      
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Full Name</label>
+          <input type="text" id="auth-name" placeholder="E.g. Adnan" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-black transition-colors">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Email Address</label>
+          <input type="email" id="auth-email" placeholder="adnan@example.com" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-black transition-colors">
+        </div>
+        <button id="btn-auth-continue" class="w-full bg-black text-white font-bold py-3.5 px-6 rounded-xl shadow-lg hover:bg-neutral-900 active:scale-[0.98] transition-all mt-2">
+          Continue
+        </button>
+        <button id="btn-auth-skip" class="w-full text-center text-sm font-bold text-gray-400 hover:text-black transition-colors mt-2">
+          Skip for now
+        </button>
+      </div>
+    </div>
+
+    <div id="auth-step-2" class="hidden">
+      <h3 class="text-2xl font-extrabold text-black mb-1">Check Your Email ✉️</h3>
+      <p class="text-sm text-gray-500 mb-6 font-medium">We sent a 6-digit verification code to <span id="auth-display-email" class="text-black font-bold"></span></p>
+      
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Verification Code</label>
+          <input type="text" id="auth-otp" placeholder="••••••" maxlength="6" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-center text-xl tracking-[0.5em] font-extrabold outline-none focus:border-black transition-colors">
+        </div>
+        <button id="btn-auth-verify" class="w-full bg-black text-white font-bold py-3.5 px-6 rounded-xl shadow-lg hover:bg-neutral-900 active:scale-[0.98] transition-all mt-2">
+          Verify & Continue
+        </button>
+        <div class="text-center mt-3">
+          <span id="auth-resend-timer" class="text-xs font-bold text-gray-400">Resend code in 60s</span>
+          <button id="btn-auth-resend" class="text-xs font-bold text-black underline hidden hover:text-gray-700">Resend Code</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script>
     lucide.createIcons();

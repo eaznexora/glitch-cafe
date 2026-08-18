@@ -106,10 +106,38 @@
           timerEl.innerText = 'Resend Code';
           timerEl.classList.remove('text-gray-400');
           timerEl.classList.add('cursor-pointer', 'text-blue-600', 'hover:text-blue-800');
-          timerEl.onclick = () => {
-            // Re-trigger Step 1 login to send a new code
-            document.getElementById('password').value = document.getElementById('password').value || '';
-            document.getElementById('login-form').dispatchEvent(new Event('submit'));
+          timerEl.onclick = async () => {
+            if (timerEl.classList.contains('text-gray-400')) return; // Cooldown active
+
+            try {
+              const res = await fetch('http://localhost:5000/api/auth/resend-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: authEmail })
+              });
+              const data = await res.json();
+              if (res.ok) {
+                // Show temporary toast or alert
+                const errAlert = document.getElementById('error-alert');
+                errAlert.innerText = 'New OTP sent successfully!';
+                errAlert.classList.remove('hidden', 'bg-red-50', 'text-red-600', 'border-red-200');
+                errAlert.classList.add('bg-green-50', 'text-green-600', 'border-green-200');
+                
+                // Hide after 3 seconds
+                setTimeout(() => {
+                  errAlert.classList.add('hidden');
+                  // Restore error styling for future errors
+                  errAlert.classList.remove('bg-green-50', 'text-green-600', 'border-green-200');
+                  errAlert.classList.add('bg-red-50', 'text-red-600', 'border-red-200');
+                }, 3000);
+
+                startResendTimer();
+              } else {
+                alert(data.error || 'Failed to resend OTP');
+              }
+            } catch (err) {
+              alert('Network error, please try again later.');
+            }
           };
         } else {
           timerEl.innerText = `Resend in ${timeLeft}s`;

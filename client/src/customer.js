@@ -6,7 +6,7 @@ const socket = io('http://localhost:5000'); // Connect to Socket.io
 
 let menuItems = [];
 let categories = [];
-let cart = {}; // { itemId: { item, quantity, selectedSize, selectedToppings } }
+let cart = []; // [{ id, name, size, toppings: [], quantity, price, subtotal }]
 let modalItemId = null;
 let modalSelectedSize = null;
 let modalSelectedToppings = [];
@@ -17,8 +17,19 @@ let isManualScrolling = false;
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', () => {
+  const savedCart = localStorage.getItem('glitch_cart');
+  if (savedCart) {
+    try {
+      cart = JSON.parse(savedCart);
+      updateFloatingCartBar();
+    } catch (e) {
+      cart = [];
+    }
+  }
+
   initURLParams();
   setGreeting();
+  initCustomerAuth();
   fetchMenu();
   
   // Event Delegation for dynamically rendered Add buttons
@@ -471,10 +482,152 @@ window.updateModalQty = (change) => {
 };
 
 window.addToOrder = () => {
-  console.log("Item added to order");
-  // Add to cart visually
-  updateCart(modalItemId, modalQuantity);
+  const item = menuItems.find(i => i._id === modalItemId);
+  if (!item) return;
+
+  const basePrice = Number(item.price) || 0;
+  let unitPrice = basePrice;
+  let sizeName = null;
+  let selectedToppingNames = [];
+
+  if (modalSelectedSize !== null && item.sizes && item.sizes[modalSelectedSize]) {
+    unitPrice += Number(item.sizes[modalSelectedSize].price || 0);
+    sizeName = item.sizes[modalSelectedSize].name;
+  }
+
+  if (item.toppings) {
+    modalSelectedToppings.forEach(idx => {
+      unitPrice += Number(item.toppings[idx].price || 0);
+      selectedToppingNames.push(item.toppings[idx].name);
+    });
+  }
+
+  const subtotal = unitPrice * modalQuantity;
+
+  // Check if identical item already exists (same id, size, toppings)
+  const existingIdx = cart.findIndex(c => 
+    c.id === item._id && 
+    c.size === sizeName && 
+    JSON.stringify(c.toppings) === JSON.stringify(selectedToppingNames)
+  );
+
+  if (existingIdx > -1) {
+    cart[existingIdx].quantity += modalQuantity;
+    cart[existingIdx].subtotal = cart[existingIdx].quantity * cart[existingIdx].price;
+    // Force inject the property onto stale items in case they were added before the fix
+    cart[existingIdx].isGlitchSpecial = Boolean(item.isSpecial || item.isGlitchSpecial || item.special);
+    cart[existingIdx].isSpecial = Boolean(item.isSpecial || item.isGlitchSpecial || item.special);
+  } else {
+    cart.push({
+      id: item._id,
+      name: item.name,
+      isGlitchSpecial: Boolean(item.isSpecial || item.isGlitchSpecial || item.special),
+      isSpecial: Boolean(item.isSpecial || item.isGlitchSpecial || item.special),
+      size: sizeName,
+      toppings: selectedToppingNames,
+      quantity: modalQuantity,
+      price: unitPrice,
+      subtotal: subtotal
+    });
+  }
+
+  console.log("Item added to order", cart);
+  localStorage.setItem('glitch_cart', JSON.stringify(cart));
   closeCustomizationModal();
+  updateFloatingCartBar();
+};
+
+window.updateFloatingCartBar = () => {
+  const totalCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const cartBar = document.getElementById('floating-cart-bar');
+  const countBadge = document.getElementById('floating-cart-count');
+  
+  if (totalCount > 0) {
+    countBadge.innerText = `(${totalCount} item${totalCount > 1 ? 's' : ''})`;
+    cartBar.classList.remove('translate-y-full', 'opacity-0');
+    cartBar.classList.add('translate-y-0', 'opacity-100');
+  } else {
+    cartBar.classList.remove('translate-y-0', 'opacity-100');
+    cartBar.classList.add('translate-y-full', 'opacity-0');
+  }
+};
+
+window.openCartDrawer = () => {
+  const backdrop = document.getElementById('cart-drawer-backdrop');
+  const drawer = document.getElementById('cart-drawer');
+  
+  if (backdrop && drawer) {
+    backdrop.classList.remove('hidden');
+    drawer.classList.remove('hidden');
+    
+    // Allow display to update before animating
+    setTimeout(() => {
+      backdrop.classList.remove('opacity-0');
+      backdrop.classList.add('opacity-100');
+      drawer.classList.remove('translate-y-full');
+      drawer.classList.add('translate-y-0');
+    }, 10);
+    
+    renderCartItems();
+  }
+};
+
+window.closeCartDrawer = () => {
+  const backdrop = document.getElementById('cart-drawer-backdrop');
+  const drawer = document.getElementById('cart-drawer');
+  
+  if (backdrop && drawer) {
+    backdrop.classList.remove('opacity-100');
+    backdrop.classList.add('opacity-0');
+    drawer.classList.remove('translate-y-0');
+    drawer.classList.add('translate-y-full');
+    
+    setTimeout(() => {
+      backdrop.classList.add('hidden');
+      drawer.classList.add('hidden');
+    }, 300);
+  }
+};
+
+window.renderCartItems = () => {
+  const container = document.getElementById('cart-items-container');
+  const subtotalDisplay = document.getElementById('cart-subtotal-display');
+  
+  if (!container) return;
+  
+  if (cart.length === 0) {
+    container.innerHTML = '<div class="text-center text-gray-500 py-8">Your cart is empty</div>';
+    if (subtotalDisplay) subtotalDisplay.innerText = '₹0';
+    return;
+  }
+  
+  let html = '';
+  let subtotal = 0;
+  
+  cart.forEach((item, index) => {
+    subtotal += item.subtotal;
+    let details = [];
+    if (item.size) details.push(`Size: ${item.size}`);
+    if (item.toppings && item.toppings.length) details.push(`Toppings: ${item.toppings.join(', ')}`);
+    
+    const detailsStr = details.length ? `<p class="text-xs text-gray-500 mt-1">${details.join(' | ')}</p>` : '';
+    
+    html += `
+      <div class="flex justify-between items-start border-b border-gray-100 pb-3">
+        <div class="flex-1 pr-4">
+          <div class="flex items-center">
+            <h4 class="font-bold text-sm text-gray-900">${item.name}</h4>
+          </div>
+          ${detailsStr}
+          <div class="font-bold text-sm mt-1">₹${item.price} x ${item.quantity}</div>
+        </div>
+        <div class="font-bold text-gray-900 shrink-0">₹${item.subtotal}</div>
+      </div>
+    `;
+  });
+  
+  container.innerHTML = html;
+  if (subtotalDisplay) subtotalDisplay.innerText = `₹${subtotal}`;
 };
 
 // Ensure direct event listeners are attached just in case
@@ -489,6 +642,213 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addToOrder();
   };
   
+  const viewOrderBtn = document.getElementById('btn-view-order');
+  if (viewOrderBtn) {
+    viewOrderBtn.onclick = () => {
+      window.location.href = 'order.html' + window.location.search;
+    };
+  }
+  
+  const closeCartBtn = document.getElementById('close-cart-drawer');
+  if (closeCartBtn) closeCartBtn.onclick = window.closeCartDrawer;
+  
+  const cartBackdrop = document.getElementById('cart-drawer-backdrop');
+  if (cartBackdrop) cartBackdrop.onclick = window.closeCartDrawer;
+  
   // Fetch live database menu
   fetchMenu();
 });
+
+// Customer Auth Logic
+let authTimer = null;
+let currentAuthEmail = '';
+
+function initCustomerAuth() {
+  const customerStr = localStorage.getItem('glitch_customer');
+  let customer = null;
+  if (customerStr) {
+    try {
+      customer = JSON.parse(customerStr);
+    } catch (e) {}
+  }
+
+  const nameEl = document.getElementById('header-name');
+  if (customer && customer.isVerified) {
+    if (nameEl) nameEl.innerText = customer.name;
+    return; // Already verified, don't show modal
+  }
+
+  // Not verified, show Guest
+  if (nameEl) nameEl.innerText = 'Guest';
+
+  // Check if dismissed
+  if (sessionStorage.getItem('glitch_auth_dismissed') === 'true') {
+    return;
+  }
+
+  // Start 30s timer
+  authTimer = setTimeout(() => {
+    showAuthModal();
+  }, 30000);
+
+  // Bind Events
+  const closeBtn = document.getElementById('btn-close-auth');
+  const skipBtn = document.getElementById('btn-auth-skip');
+  const backdrop = document.getElementById('customer-auth-backdrop');
+  
+  if (closeBtn) closeBtn.addEventListener('click', dismissAuthModal);
+  if (skipBtn) skipBtn.addEventListener('click', dismissAuthModal);
+  if (backdrop) backdrop.addEventListener('click', dismissAuthModal);
+  
+  const continueBtn = document.getElementById('btn-auth-continue');
+  const verifyBtn = document.getElementById('btn-auth-verify');
+  const resendBtn = document.getElementById('btn-auth-resend');
+  
+  if (continueBtn) continueBtn.addEventListener('click', handleAuthRequestOTP);
+  if (verifyBtn) verifyBtn.addEventListener('click', handleAuthVerify);
+  if (resendBtn) resendBtn.addEventListener('click', handleAuthRequestOTP);
+}
+
+function showAuthModal() {
+  const backdrop = document.getElementById('customer-auth-backdrop');
+  const modal = document.getElementById('customer-auth-modal');
+  if (!backdrop || !modal) return;
+  
+  backdrop.classList.remove('hidden');
+  modal.classList.remove('hidden');
+  
+  // Trigger animation after layout
+  setTimeout(() => {
+    backdrop.classList.remove('opacity-0');
+    backdrop.classList.add('opacity-100', 'pointer-events-auto');
+    modal.classList.remove('translate-y-full');
+    modal.classList.add('translate-y-0');
+  }, 10);
+}
+
+function dismissAuthModal() {
+  const backdrop = document.getElementById('customer-auth-backdrop');
+  const modal = document.getElementById('customer-auth-modal');
+  if (!backdrop || !modal) return;
+  
+  sessionStorage.setItem('glitch_auth_dismissed', 'true');
+  
+  backdrop.classList.remove('opacity-100', 'pointer-events-auto');
+  backdrop.classList.add('opacity-0', 'pointer-events-none');
+  modal.classList.remove('translate-y-0');
+  modal.classList.add('translate-y-full');
+  
+  setTimeout(() => {
+    backdrop.classList.add('hidden');
+    modal.classList.add('hidden');
+  }, 300);
+}
+
+async function handleAuthRequestOTP() {
+  const name = document.getElementById('auth-name').value.trim();
+  const email = document.getElementById('auth-email').value.trim();
+  
+  if (!name || !email) {
+    alert('Please enter both Name and Email');
+    return;
+  }
+
+  const btn = document.getElementById('btn-auth-continue');
+  const originalText = btn.innerText;
+  btn.innerText = 'Sending...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(`${API_BASE}/customer/request-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email })
+    });
+    const data = await res.json();
+    
+    if (res.ok) {
+      currentAuthEmail = email;
+      document.getElementById('auth-step-1').classList.add('hidden');
+      document.getElementById('auth-step-2').classList.remove('hidden');
+      document.getElementById('auth-display-email').innerText = email;
+      startResendTimer();
+    } else {
+      alert(data.error || 'Failed to send OTP');
+    }
+  } catch (err) {
+    alert('Error connecting to server');
+  } finally {
+    btn.innerText = originalText;
+    btn.disabled = false;
+  }
+}
+
+async function handleAuthVerify() {
+  const name = document.getElementById('auth-name').value.trim();
+  const otp = document.getElementById('auth-otp').value.trim();
+  
+  if (!otp || otp.length !== 6) {
+    alert('Please enter a valid 6-digit code');
+    return;
+  }
+
+  const btn = document.getElementById('btn-auth-verify');
+  btn.innerText = 'Verifying...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(`${API_BASE}/customer/verify-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email: currentAuthEmail, otp })
+    });
+    const data = await res.json();
+    
+    if (res.ok) {
+      localStorage.setItem('glitch_customer', JSON.stringify({
+        name: data.customer.name,
+        email: data.customer.email,
+        isVerified: true
+      }));
+      
+      const nameEl = document.getElementById('header-name');
+      if (nameEl) nameEl.innerText = data.customer.name;
+      
+      dismissAuthModal();
+      
+      // Optional: show a small toast "Welcome, [Name]!"
+      setTimeout(() => alert(`Welcome, ${data.customer.name}!`), 350);
+    } else {
+      alert(data.error || 'Invalid OTP');
+    }
+  } catch (err) {
+    alert('Error connecting to server');
+  } finally {
+    btn.innerText = 'Verify & Continue';
+    btn.disabled = false;
+  }
+}
+
+let resendInterval = null;
+function startResendTimer() {
+  const timerSpan = document.getElementById('auth-resend-timer');
+  const resendBtn = document.getElementById('btn-auth-resend');
+  
+  timerSpan.classList.remove('hidden');
+  resendBtn.classList.add('hidden');
+  
+  let left = 60;
+  timerSpan.innerText = `Resend code in ${left}s`;
+  
+  clearInterval(resendInterval);
+  resendInterval = setInterval(() => {
+    left--;
+    if (left <= 0) {
+      clearInterval(resendInterval);
+      timerSpan.classList.add('hidden');
+      resendBtn.classList.remove('hidden');
+    } else {
+      timerSpan.innerText = `Resend code in ${left}s`;
+    }
+  }, 1000);
+}
