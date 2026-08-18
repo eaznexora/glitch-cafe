@@ -45,7 +45,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="./src/auth.js"></script>
-  </head>
+  <script src="./src/auth.js"></script>
+<script src="./src/sidebar.js"></script>
+</head>
   <body class="flex h-screen overflow-hidden bg-monochrome-100 text-monochrome-900 font-sans relative">
     
     <div id="sidebar-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden lg:hidden" onclick="toggleSidebar()"></div>
@@ -208,29 +210,49 @@
               <input type="number" id="item-price" class="input-field" required min="0" step="0.01" placeholder="0.00">
             </div>
 
-            <div class="md:col-span-2">
-              <label class="label-text">Food Type</label>
-              <div class="flex space-x-4 mt-1">
-                <label class="flex items-center space-x-2 cursor-pointer">
-                  <input type="radio" name="item-food-type" value="Veg" class="text-monochrome-900 focus:ring-monochrome-900" checked>
-                  <span class="text-sm font-medium text-green-700">Veg</span>
-                </label>
-                <label class="flex items-center space-x-2 cursor-pointer">
-                  <input type="radio" name="item-food-type" value="Non-Veg" class="text-monochrome-900 focus:ring-monochrome-900">
-                  <span class="text-sm font-medium text-red-700">Non-Veg</span>
-                </label>
-                <label class="flex items-center space-x-2 cursor-pointer">
-                  <input type="radio" name="item-food-type" value="Vegan" class="text-monochrome-900 focus:ring-monochrome-900">
-                  <span class="text-sm font-medium text-emerald-600">Vegan</span>
-                </label>
+            <div>
+              <label class="label-text">Item Order / Priority</label>
+              <input type="number" id="item-order" class="input-field" value="1" min="1" placeholder="e.g. 1, 2, 3">
+            </div>
+
+            <div class="md:col-span-2 flex items-center space-x-6 mt-1">
+              <label for="item-isveg" class="flex items-center space-x-2 cursor-pointer">
+                <input type="checkbox" id="item-isveg" class="w-4 h-4 text-green-600 rounded focus:ring-green-500" checked>
+                <span class="text-sm font-medium text-gray-700">🌱 Vegetarian</span>
+              </label>
+              <label for="item-isspecial" class="flex items-center space-x-2 cursor-pointer">
+                <input type="checkbox" id="item-isspecial" class="w-4 h-4 text-yellow-600 rounded focus:ring-yellow-500">
+                <span class="text-sm font-medium text-gray-700">✦ THE GLITCH SPECIAL ✦</span>
+              </label>
+            </div>
+
+            <!-- Dynamic Sizes Repeater -->
+            <div class="md:col-span-2 bg-gray-50 p-4 rounded-lg border border-gray-200 mt-2">
+              <div class="flex items-center justify-between mb-3">
+                <label class="label-text mb-0 font-bold text-gray-700">Portion / Sizes (Optional)</label>
+                <button type="button" class="text-xs font-bold text-monochrome-900 bg-white border border-monochrome-900 px-3 py-1.5 rounded hover:bg-gray-100 transition-colors flex items-center" onclick="addSizeRow()">
+                  <i data-lucide="plus" class="h-3 w-3 mr-1"></i> Add Size Variant
+                </button>
+              </div>
+              <div id="sizes-container" class="space-y-2">
+                <!-- Rows appended dynamically via JS -->
               </div>
             </div>
 
-            <div class="md:col-span-2">
-              <label class="label-text">Image URL</label>
-              <input type="url" id="item-image" class="input-field" placeholder="https://example.com/image.jpg">
-              <p class="text-xs text-gray-500 mt-1">Leave blank to use a default placeholder icon.</p>
+            <!-- Dynamic Toppings Repeater -->
+            <div class="md:col-span-2 bg-gray-50 p-4 rounded-lg border border-gray-200 mt-2">
+              <div class="flex items-center justify-between mb-3">
+                <label class="label-text mb-0 font-bold text-gray-700">Add-ons / Toppings (Optional)</label>
+                <button type="button" class="text-xs font-bold text-monochrome-900 bg-white border border-monochrome-900 px-3 py-1.5 rounded hover:bg-gray-100 transition-colors flex items-center" onclick="addToppingRow()">
+                  <i data-lucide="plus" class="h-3 w-3 mr-1"></i> Add Topping
+                </button>
+              </div>
+              <div id="toppings-container" class="space-y-2">
+                <!-- Rows appended dynamically via JS -->
+              </div>
             </div>
+
+
             
             <div class="md:col-span-2">
               <label class="label-text">Description / Ingredients</label>
@@ -288,3 +310,4 @@
     <script src="./src/menu.js"></script>
   </body>
 </html>
+

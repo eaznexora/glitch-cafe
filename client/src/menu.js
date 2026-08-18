@@ -17,9 +17,10 @@ async function initMenu() {
 
 async function fetchCategories() {
   try {
-    const res = await fetch(`${API_BASE}/categories`);
+    const res = await fetch(`${API_BASE}/categories`, { headers: getAuthHeaders() });
     if (res.ok) {
       categoriesData = await res.json();
+      categoriesData.sort((a, b) => (Number(a.displayOrder) || 999) - (Number(b.displayOrder) || 999));
       renderCategoryList();
       renderCategoryPills();
       populateCategorySelects();
@@ -31,9 +32,10 @@ async function fetchCategories() {
 
 async function fetchMenuItems() {
   try {
-    const res = await fetch(`${API_BASE}/menu-items`);
+    const res = await fetch(`${API_BASE}/products`, { headers: getAuthHeaders() });
     if (res.ok) {
       menuItemsData = await res.json();
+      menuItemsData.sort((a, b) => (Number(a.displayOrder) || 999) - (Number(b.displayOrder) || 999));
       filterMenuItems();
     }
   } catch (err) {
@@ -53,7 +55,11 @@ function renderCategoryList() {
   }
   
   categoriesData.forEach(cat => {
-    const count = menuItemsData.filter(i => i.categoryId && i.categoryId._id === cat._id).length;
+    const count = menuItemsData.filter(p => 
+      (p.categoryId === cat._id) || 
+      (p.categoryId && p.categoryId._id === cat._id) ||
+      (p.categorySlug === cat.slug)
+    ).length;
     const div = document.createElement('div');
     div.className = 'flex items-center justify-between p-3 bg-white hover:bg-gray-50 rounded border border-transparent hover:border-gray-200 transition-colors group';
     div.innerHTML = `
@@ -64,7 +70,8 @@ function renderCategoryList() {
           <div class="text-xs text-gray-500">${count} items</div>
         </div>
       </div>
-      <div class="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <span class="bg-gray-200 text-gray-700 text-[10px] font-bold px-2 py-0.5 rounded mr-1">#${cat.displayOrder || 1}</span>
         <button class="p-1.5 text-gray-400 hover:text-black rounded hover:bg-gray-200" onclick="openCategoryModal('${cat._id}')"><i data-lucide="edit-2" class="h-3 w-3"></i></button>
         <button class="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50" onclick="promptDelete('category', '${cat._id}', '${cat.name}')"><i data-lucide="trash-2" class="h-3 w-3"></i></button>
       </div>
@@ -108,7 +115,11 @@ window.filterMenuItems = () => {
   const searchQ = document.getElementById('menu-search').value.toLowerCase();
   
   const filtered = menuItemsData.filter(item => {
-    const matchesCat = currentCategoryFilter === 'all' || (item.categoryId && item.categoryId._id === currentCategoryFilter);
+    const matchesCat = currentCategoryFilter === 'all' || 
+      item.categoryId === currentCategoryFilter || 
+      (item.categoryId && item.categoryId._id === currentCategoryFilter) ||
+      (item.categorySlug && categoriesData.find(c => c._id === currentCategoryFilter)?.slug === item.categorySlug);
+      
     const matchesSearch = item.name.toLowerCase().includes(searchQ) || (item.description && item.description.toLowerCase().includes(searchQ));
     return matchesCat && matchesSearch;
   });
@@ -129,32 +140,31 @@ function renderMenuItems(items) {
   items.forEach(item => {
     const catName = item.categoryId ? item.categoryId.name : 'Uncategorized';
     
-    let typeIcon = '';
-    let typeColor = '';
-    if (item.foodType === 'Veg') { typeIcon = 'leaf'; typeColor = 'text-green-700 bg-green-50 border-green-200'; }
-    else if (item.foodType === 'Non-Veg') { typeIcon = 'drumstick'; typeColor = 'text-red-700 bg-red-50 border-red-200'; }
-    else if (item.foodType === 'Vegan') { typeIcon = 'sprout'; typeColor = 'text-emerald-700 bg-emerald-50 border-emerald-200'; }
-    
-    const imageUrl = item.imageUrl || 'https://via.placeholder.com/400x300/f1f5f9/94a3b8?text=No+Image';
+    let typeIcon = item.isVeg ? 'leaf' : 'drumstick';
+    let typeColor = item.isVeg ? 'text-green-700 bg-green-50 border-green-200' : 'text-red-700 bg-red-50 border-red-200';
+    let typeText = item.isVeg ? 'Vegetarian' : 'Non-Veg';
 
     const card = document.createElement('div');
-    card.className = `bg-white rounded-lg border ${item.isAvailable ? 'border-gray-200 shadow-sm' : 'border-dashed border-gray-300 opacity-75 grayscale-[50%]'} flex flex-col overflow-hidden transition-all group`;
+    card.className = `bg-white rounded-lg border ${item.isAvailable ? 'border-gray-200 shadow-sm' : 'border-dashed border-gray-300 opacity-75 grayscale-[50%]'} flex flex-col overflow-hidden transition-all group p-4 relative`;
     
     card.innerHTML = `
-      <div class="h-32 bg-gray-100 relative">
-        <img src="${imageUrl}" alt="${item.name}" class="w-full h-full object-cover">
-        <div class="absolute top-2 right-2 bg-white px-2 py-1 rounded text-xs font-bold shadow border border-gray-200 uppercase tracking-wider">${catName}</div>
-        ${!item.isAvailable ? `<div class="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center"><span class="bg-red-600 text-white font-bold px-3 py-1 rounded shadow-lg tracking-wider text-sm">OUT OF STOCK</span></div>` : ''}
-      </div>
-      <div class="p-4 flex-1 flex flex-col">
+      ${!item.isAvailable ? `<div class="absolute inset-0 bg-black bg-opacity-5 z-10 flex items-center justify-center pointer-events-none"><span class="bg-red-600 text-white font-bold px-3 py-1 rounded shadow-lg tracking-wider text-sm">OUT OF STOCK</span></div>` : ''}
+      <div class="flex-1 flex flex-col">
         <div class="flex justify-between items-start mb-2">
-          <h4 class="font-bold text-monochrome-900 line-clamp-1 flex-1 pr-2">${item.name}</h4>
-          <span class="font-bold text-lg text-monochrome-900 whitespace-nowrap">₹${item.price.toFixed(2)}</span>
+          <div class="flex flex-col flex-1 pr-2">
+            <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">${catName}</span>
+            <h4 class="font-bold text-monochrome-900 line-clamp-1">${item.name}</h4>
+          </div>
+          <div class="flex flex-col items-end">
+            <span class="font-bold text-lg text-monochrome-900 whitespace-nowrap">₹${item.price.toFixed(2)}</span>
+            <span class="bg-gray-100 text-gray-600 border border-gray-200 text-[10px] font-bold px-1.5 py-0.5 rounded mt-1">#${item.displayOrder || 1}</span>
+          </div>
         </div>
         <div class="flex items-center space-x-2 mb-3">
           <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${typeColor}">
-            <i data-lucide="${typeIcon}" class="h-3 w-3 mr-1"></i> ${item.foodType}
+            <i data-lucide="${typeIcon}" class="h-3 w-3 mr-1"></i> ${typeText}
           </span>
+          ${item.isSpecial ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider text-yellow-700 bg-yellow-50 border-yellow-200">✦ Special</span>` : ''}
         </div>
         <p class="text-xs text-gray-500 line-clamp-2 flex-1 mb-4">${item.description || 'No description provided.'}</p>
         
@@ -224,7 +234,7 @@ window.saveCategory = async () => {
     
     const res = await fetch(url, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(payload)
     });
     
@@ -240,6 +250,32 @@ window.saveCategory = async () => {
   }
 };
 
+window.addSizeRow = (name = '', price = '') => {
+  const container = document.getElementById('sizes-container');
+  const div = document.createElement('div');
+  div.className = 'size-row flex space-x-2 items-center';
+  div.innerHTML = `
+    <input type="text" class="size-name flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-monochrome-900 text-sm bg-white" placeholder="e.g. Regular" value="${name}">
+    <input type="number" class="size-price w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-monochrome-900 text-sm bg-white" placeholder="₹" value="${price}">
+    <button type="button" class="text-red-500 hover:text-red-700 p-2" onclick="this.parentElement.remove()"><i data-lucide="trash-2" class="h-4 w-4"></i></button>
+  `;
+  container.appendChild(div);
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+window.addToppingRow = (name = '', price = '') => {
+  const container = document.getElementById('toppings-container');
+  const div = document.createElement('div');
+  div.className = 'topping-row flex space-x-2 items-center';
+  div.innerHTML = `
+    <input type="text" class="topping-name flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-monochrome-900 text-sm bg-white" placeholder="e.g. Extra Cheese" value="${name}">
+    <input type="number" class="topping-price w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-monochrome-900 text-sm bg-white" placeholder="₹" value="${price}">
+    <button type="button" class="text-red-500 hover:text-red-700 p-2" onclick="this.parentElement.remove()"><i data-lucide="trash-2" class="h-4 w-4"></i></button>
+  `;
+  container.appendChild(div);
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
 window.openMenuItemModal = (id = null) => {
   const modal = document.getElementById('menu-item-modal');
   const form = document.getElementById('menu-item-form');
@@ -252,18 +288,32 @@ window.openMenuItemModal = (id = null) => {
     if (item) {
       title.innerText = 'Edit Food Item';
       document.getElementById('item-id').value = item._id;
-      document.getElementById('item-name').value = item.name;
+      document.getElementById('item-name').value = item.name || '';
       document.getElementById('item-category').value = item.categoryId ? item.categoryId._id : '';
-      document.getElementById('item-price').value = item.price;
-      document.getElementById('item-image').value = item.imageUrl || '';
+      document.getElementById('item-price').value = item.price || '';
+      document.getElementById('item-order').value = item.displayOrder || 1;
       document.getElementById('item-desc').value = item.description || '';
       document.getElementById('item-available').checked = item.isAvailable;
+      document.getElementById('item-isveg').checked = Boolean(item.isVeg !== false); // Default veg to true if undefined
+      document.getElementById('item-isspecial').checked = Boolean(item.isSpecial);
       
-      const radio = document.querySelector(`input[name="item-food-type"][value="${item.foodType || 'Veg'}"]`);
-      if (radio) radio.checked = true;
+      document.getElementById('sizes-container').innerHTML = '';
+      if (item.sizes && item.sizes.length) {
+        item.sizes.forEach(s => addSizeRow(s.name, s.price));
+      }
+      
+      document.getElementById('toppings-container').innerHTML = '';
+      if (item.toppings && item.toppings.length) {
+        item.toppings.forEach(t => addToppingRow(t.name, t.price));
+      }
     }
   } else {
     title.innerText = 'Add Food Item';
+    document.getElementById('item-order').value = 1;
+    document.getElementById('item-isveg').checked = true;
+    document.getElementById('item-isspecial').checked = false;
+    document.getElementById('sizes-container').innerHTML = '';
+    document.getElementById('toppings-container').innerHTML = '';
   }
   
   modal.classList.remove('hidden');
@@ -278,44 +328,62 @@ window.saveMenuItem = async () => {
   const name = document.getElementById('item-name').value;
   const categoryId = document.getElementById('item-category').value;
   const price = document.getElementById('item-price').value;
-  const imageUrl = document.getElementById('item-image').value;
   const description = document.getElementById('item-desc').value;
   const isAvailable = document.getElementById('item-available').checked;
-  const foodTypeRadio = document.querySelector('input[name="item-food-type"]:checked');
-  const foodType = foodTypeRadio ? foodTypeRadio.value : 'Veg';
+  const isVeg = document.getElementById('item-isveg')?.checked ?? true;
+  const isSpecial = document.getElementById('item-isspecial')?.checked ?? false;
+  const displayOrder = Number(document.getElementById('item-order').value) || 1;
   
   if (!name || !categoryId || !price) return alert('Name, Category, and Price are required.');
 
-  const payload = { name, categoryId, price: parseFloat(price), imageUrl, description, isAvailable, foodType };
+  // Find categorySlug from selected category
+  const selectedCat = categoriesData.find(c => c._id === categoryId);
+  const categorySlug = selectedCat ? selectedCat.slug : '';
+
+  const sizes = Array.from(document.querySelectorAll('.size-row')).map(row => ({
+    name: row.querySelector('.size-name').value.trim(),
+    price: Number(row.querySelector('.size-price').value) || 0
+  })).filter(s => s.name);
+
+  const toppings = Array.from(document.querySelectorAll('.topping-row')).map(row => ({
+    name: row.querySelector('.topping-name').value.trim(),
+    price: Number(row.querySelector('.topping-price').value) || 0
+  })).filter(t => t.name);
+
+  const payload = { name, categoryId, categorySlug, price: parseFloat(price), description, isAvailable, isVeg, isSpecial, displayOrder, sizes, toppings };
   
   try {
-    const url = id ? `${API_BASE}/menu-items/${id}` : `${API_BASE}/menu-items`;
+    const url = id ? `${API_BASE}/products/${id}` : `${API_BASE}/products`;
     const method = id ? 'PUT' : 'POST';
     
     const res = await fetch(url, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(payload)
     });
     
     if (res.ok) {
+      const doc = await res.json();
+      console.log('Saved Document:', doc);
+      alert('Product saved successfully!');
       closeMenuItemModal();
       await fetchMenuItems(); // Refresh grid
       renderCategoryList(); // Update counts in sidebar
     } else {
       const err = await res.json();
-      alert(`Error: ${err.error}`);
+      alert(`Error: ${err.error || 'Server error'}`);
     }
   } catch (err) {
     console.error(err);
+    alert('Failed to connect to backend API.');
   }
 };
 
 window.toggleStock = async (id, isAvailable) => {
   try {
-    const res = await fetch(`${API_BASE}/menu-items/${id}/stock`, {
+    const res = await fetch(`${API_BASE}/products/${id}/toggle-stock`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ isAvailable })
     });
     if (res.ok) {
@@ -346,10 +414,13 @@ document.getElementById('confirm-delete-btn').addEventListener('click', async ()
   if (!deleteTarget) return;
   
   const { type, id } = deleteTarget;
-  const endpoint = type === 'category' ? 'categories' : 'menu-items';
+  const endpoint = type === 'category' ? 'categories' : 'products';
   
   try {
-    const res = await fetch(`${API_BASE}/${endpoint}/${id}`, { method: 'DELETE' });
+    const res = await fetch(`${API_BASE}/${endpoint}/${id}`, { 
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
     if (res.ok) {
       closeDeleteModal();
       if (type === 'category') {

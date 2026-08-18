@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login - Glitch Cafe</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            monochrome: {
+              50: '#f5f5f5', 100: '#e5e5e5', 200: '#d4d4d4',
+              300: '#d4d4d4', 400: '#a3a3a3', 500: '#737373',
+              600: '#525252', 700: '#404040', 800: '#262626',
+              900: '#171717', 950: '#0a0a0a', white: '#ffffff'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-monochrome-50 min-h-screen flex items-center justify-center p-4">
+
+  <div class="bg-white rounded-xl shadow-lg max-w-md w-full p-8 border border-gray-200">
+    <div class="text-center mb-8">
+      <h1 class="text-3xl font-extrabold italic uppercase tracking-wider text-monochrome-900">The Glitch Cafe</h1>
+      <p class="text-gray-500 mt-2 text-sm">Secure Admin Portal</p>
+    </div>
+
+    <form id="login-form" class="space-y-6">
+      <div id="error-alert" class="hidden bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm border border-red-200"></div>
+      
+      <!-- Step 1: Credentials -->
+      <div id="step-1">
+        <div class="mb-6">
+          <label class="block text-sm font-bold text-gray-700 mb-1" for="email">Email Address</label>
+          <input type="email" id="email" required class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-monochrome-900 bg-gray-50 focus:bg-white transition-colors" placeholder="admin@glitchcafe.com">
+        </div>
+
+        <div>
+          <label class="block text-sm font-bold text-gray-700 mb-1" for="password">Password</label>
+          <input type="password" id="password" required class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-monochrome-900 bg-gray-50 focus:bg-white transition-colors" placeholder="••••••••">
+        </div>
+      </div>
+
+      <!-- Step 2: OTP Verification -->
+      <div id="step-2" class="hidden">
+        <div class="text-center mb-6">
+          <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-monochrome-100 mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-monochrome-900" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+          </div>
+          <h3 class="font-bold text-gray-900">Verification Code Sent</h3>
+          <p class="text-xs text-gray-500 mt-1">Please enter the 6-digit code sent to your email.</p>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-bold text-gray-700 mb-1 text-center" for="otp">6-Digit Code</label>
+          <input type="text" id="otp" maxlength="6" class="w-full px-4 py-3 text-center text-2xl tracking-[0.5em] font-bold rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-monochrome-900 bg-gray-50 focus:bg-white transition-colors" placeholder="------">
+        </div>
+
+        <div class="flex justify-between items-center mt-4 text-xs font-medium">
+          <button type="button" class="text-gray-500 hover:text-black underline" onclick="resetToStep1()">Change Email</button>
+          <span id="resend-timer" class="text-gray-400">Resend in 60s</span>
+        </div>
+      </div>
+
+      <button type="submit" id="submit-btn" class="w-full bg-monochrome-900 text-white font-bold py-3 px-4 rounded-lg hover:bg-black transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-monochrome-900">
+        Sign In
+      </button>
+    </form>
+  </div>
+
+  <script src="src/auth.js"></script>
+  <script>
+    let currentStep = 1;
+    let authEmail = '';
+    let countdownInterval = null;
+
+    function resetToStep1() {
+      currentStep = 1;
+      document.getElementById('step-1').classList.remove('hidden');
+      document.getElementById('step-2').classList.add('hidden');
+      document.getElementById('submit-btn').innerText = 'Sign In';
+      document.getElementById('error-alert').classList.add('hidden');
+      document.getElementById('password').value = '';
+      document.getElementById('otp').value = '';
+      clearInterval(countdownInterval);
+    }
+
+    function startResendTimer() {
+      let timeLeft = 60;
+      const timerEl = document.getElementById('resend-timer');
+      timerEl.innerText = `Resend in ${timeLeft}s`;
+      timerEl.classList.remove('cursor-pointer', 'text-blue-600', 'hover:text-blue-800');
+      timerEl.classList.add('text-gray-400');
+      timerEl.onclick = null;
+
+      clearInterval(countdownInterval);
+      countdownInterval = setInterval(() => {
+        timeLeft--;
+        if (timeLeft <= 0) {
+          clearInterval(countdownInterval);
+          timerEl.innerText = 'Resend Code';
+          timerEl.classList.remove('text-gray-400');
+          timerEl.classList.add('cursor-pointer', 'text-blue-600', 'hover:text-blue-800');
+          timerEl.onclick = () => {
+            // Re-trigger Step 1 login to send a new code
+            document.getElementById('password').value = document.getElementById('password').value || '';
+            document.getElementById('login-form').dispatchEvent(new Event('submit'));
+          };
+        } else {
+          timerEl.innerText = `Resend in ${timeLeft}s`;
+        }
+      }, 1000);
+    }
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const otp = document.getElementById('otp').value;
+      const btn = document.getElementById('submit-btn');
+      const errAlert = document.getElementById('error-alert');
+      
+      btn.innerText = 'Authenticating...';
+      btn.disabled = true;
+      errAlert.classList.add('hidden');
+      
+      try {
+        if (currentStep === 1) {
+          // STEP 1: Validate Credentials & Send OTP
+          const res = await fetch('http://localhost:5000/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+          });
+          const data = await res.json();
+
+          if (res.ok && data.step === 'OTP_REQUIRED') {
+            currentStep = 2;
+            authEmail = data.email;
+            document.getElementById('step-1').classList.add('hidden');
+            document.getElementById('step-2').classList.remove('hidden');
+            document.getElementById('submit-btn').innerText = 'Verify Code';
+            document.getElementById('otp').focus();
+            startResendTimer();
+          } else {
+            errAlert.innerText = data.error || 'Authentication failed';
+            errAlert.classList.remove('hidden');
+          }
+        } else if (currentStep === 2) {
+          // STEP 2: Verify OTP
+          const res = await fetch('http://localhost:5000/api/auth/verify-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: authEmail, otp })
+          });
+          const data = await res.json();
+
+          if (res.ok && data.token) {
+            localStorage.setItem('adminToken', data.token);
+            localStorage.setItem('adminUser', JSON.stringify(data.user));
+            window.location.href = 'index.html'; // Dashboard
+          } else {
+            errAlert.innerText = data.error || 'Invalid or expired OTP code';
+            errAlert.classList.remove('hidden');
+          }
+        }
+      } catch (err) {
+        errAlert.innerText = 'Server connection failed';
+        errAlert.classList.remove('hidden');
+      } finally {
+        if (currentStep === 1) btn.innerText = 'Sign In';
+        if (currentStep === 2) btn.innerText = 'Verify Code';
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

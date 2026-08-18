@@ -45,7 +45,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="./src/auth.js"></script> <!-- LOAD AUTH FIRST -->
-  </head>
+  <script src="./src/auth.js"></script>
+<script src="./src/sidebar.js"></script>
+</head>
   <body class="flex h-screen overflow-hidden bg-[#f4f4f5] text-monochrome-900 font-sans relative">
     
     <div id="sidebar-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden lg:hidden" onclick="toggleSidebar()"></div>
@@ -129,7 +131,7 @@
             <table class="w-full text-left text-sm">
               <thead class="bg-gray-50 border-b border-gray-200 text-gray-500">
                 <tr>
-                  <th class="py-3 px-4 font-bold tracking-wider">Staff Name</th>
+                  <th class="py-3 px-4 font-bold tracking-wider">Staff Email</th>
                   <th class="py-3 px-4 font-bold tracking-wider">Role</th>
                   <th class="py-3 px-4 font-bold tracking-wider hidden md:table-cell">Permissions</th>
                   <th class="py-3 px-4 font-bold tracking-wider text-right">Actions</th>
@@ -204,21 +206,30 @@
         <div class="p-6 overflow-y-auto space-y-6">
           <div class="grid grid-cols-2 gap-4">
             <div class="col-span-2">
-              <label class="label-text">Full Name</label>
-              <input type="text" id="staff-name" class="input-field" placeholder="e.g. John Doe">
+              <label class="label-text">Email Address</label>
+              <input type="email" id="staff-email" class="input-field" placeholder="e.g. staff@glitchcafe.com">
             </div>
-            <div>
-              <label class="label-text">Username / Login ID</label>
-              <input type="text" id="staff-username" class="input-field" placeholder="e.g. john_d">
-            </div>
-            <div>
-              <label class="label-text">Role Preset</label>
-              <select id="staff-role-preset" class="input-field bg-gray-50" onchange="applyRolePreset(this.value)">
-                <option value="Admin">Admin</option>
-                <option value="Chef">Chef</option>
-                <option value="Cashier">Cashier</option>
-                <option value="Custom">Custom</option>
-              </select>
+            <div class="col-span-2">
+              <label class="label-text">Password</label>
+              <div class="relative">
+                <input 
+                  type="password" 
+                  id="staff-password" 
+                  placeholder="••••••••" 
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-black"
+                />
+                <button 
+                  type="button" 
+                  id="toggle-staff-password" 
+                  class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-black"
+                >
+                  <!-- Eye Icon SVG (Toggles between Eye and Eye-Off on click) -->
+                  <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -231,12 +242,20 @@
                 <span class="text-sm font-medium">Dashboard Overview</span>
               </label>
               <label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-50 cursor-pointer">
-                <input type="checkbox" value="live_orders" class="perm-checkbox" checked>
+                <input type="checkbox" value="orders" class="perm-checkbox" checked>
                 <span class="text-sm font-medium">Live Orders & KDS</span>
               </label>
               <label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" value="tables" class="perm-checkbox" checked>
+                <span class="text-sm font-medium">Table Management</span>
+              </label>
+              <label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-50 cursor-pointer">
                 <input type="checkbox" value="menu" class="perm-checkbox" checked>
-                <span class="text-sm font-medium">Menu & Inventory</span>
+                <span class="text-sm font-medium">Menu & Categories</span>
+              </label>
+              <label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" value="inventory" class="perm-checkbox" checked>
+                <span class="text-sm font-medium">Inventory</span>
               </label>
               <label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-50 cursor-pointer">
                 <input type="checkbox" value="billing" class="perm-checkbox" checked>
@@ -282,3 +301,4 @@
     <script src="./src/settings.js"></script>
   </body>
 </html>
+

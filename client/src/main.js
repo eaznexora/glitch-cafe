@@ -1,7 +1,7 @@
 // Using Chart and io from global scope (via CDN)
 
-const API_BASE = 'http://localhost:3000/api';
-const socket = io('http://localhost:3000');
+const API_BASE = 'http://localhost:5000/api';
+const socket = io('http://localhost:5000');
 
 // Global state
 let salesChartInstance = null;
@@ -84,7 +84,7 @@ function updateTicketTimers() {
 
 async function fetchStats() {
   try {
-    const res = await fetch(`${API_BASE}/dashboard/stats`);
+    const res = await fetch(`${API_BASE}/dashboard/stats`, { headers: getAuthHeaders() });
     const data = await res.json();
     if (res.ok) {
       document.getElementById('kpi-revenue').innerText = `₹${data.revenue.toLocaleString()}`;
@@ -100,7 +100,7 @@ async function fetchStats() {
 
 async function fetchChartData() {
   try {
-    const res = await fetch(`${API_BASE}/dashboard/chart-data?range=today`);
+    const res = await fetch(`${API_BASE}/dashboard/chart-data?range=today`, { headers: getAuthHeaders() });
     const data = await res.json();
     if (res.ok) {
       const ctx = document.getElementById('salesChart').getContext('2d');
@@ -121,7 +121,7 @@ async function fetchChartData() {
 
 async function fetchAllOrders() {
   try {
-    const res = await fetch(`${API_BASE}/orders`);
+    const res = await fetch(`${API_BASE}/orders`, { headers: getAuthHeaders() });
     const data = await res.json();
     if (res.ok) {
       allOrdersData = data;
@@ -498,7 +498,7 @@ window.submitRejection = async (reason) => {
   try {
     await fetch(`${API_BASE}/orders/${orderToReject}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ status: 'REJECTED', rejectionReason: reason })
     });
     closeRejectionModal();
@@ -517,7 +517,7 @@ window.updateOrderStatus = async (id, newStatus, newPaymentStatus = null) => {
     
     await fetch(`${API_BASE}/orders/${id}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(payload)
     });
     closeOrderDrawer(); // Auto close drawer on action if present

@@ -4,9 +4,10 @@ const Table = require('../models/Table');
 const Order = require('../models/Order');
 const Category = require('../models/Category');
 const MenuItem = require('../models/MenuItem');
+const { authMiddleware, superAdminMiddleware } = require('../middleware/auth');
 
 // Get Dashboard Stats
-router.get('/dashboard/stats', async (req, res) => {
+router.get('/dashboard/stats', authMiddleware, async (req, res) => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -35,7 +36,7 @@ router.get('/dashboard/stats', async (req, res) => {
 });
 
 // Get Chart Data
-router.get('/dashboard/chart-data', async (req, res) => {
+router.get('/dashboard/chart-data', authMiddleware, async (req, res) => {
   try {
     const range = req.query.range || 'today';
     // Dummy chart data for now based on range
@@ -48,7 +49,7 @@ router.get('/dashboard/chart-data', async (req, res) => {
 });
 
 // Get Live Orders
-router.get('/orders/live', async (req, res) => {
+router.get('/orders/live', authMiddleware, async (req, res) => {
   try {
     const activeOrders = await Order.find({ status: { $nin: ['COMPLETED', 'REJECTED'] } })
       .populate('tableId', 'tableNumber')
@@ -60,7 +61,7 @@ router.get('/orders/live', async (req, res) => {
 });
 
 // Get All Orders (for Master Feed)
-router.get('/orders', async (req, res) => {
+router.get('/orders', authMiddleware, async (req, res) => {
   try {
     const allOrders = await Order.find()
       .populate('tableId', 'tableNumber')
@@ -72,7 +73,7 @@ router.get('/orders', async (req, res) => {
 });
 
 // Update Order Status
-router.patch('/orders/:id/status', async (req, res) => {
+router.patch('/orders/:id/status', authMiddleware, async (req, res) => {
   try {
     const { status, paymentStatus, paymentMethod } = req.body;
     const update = {};
@@ -95,18 +96,25 @@ router.patch('/orders/:id/status', async (req, res) => {
 
 // --- CATEGORIES CRUD ---
 
-router.get('/categories', async (req, res) => {
+router.get('/categories', async (req, res, next) => {
   try {
-    const categories = await Category.find().sort({ displayOrder: 1 });
+    const categories = await Category.find({ isActive: true }).sort({ displayOrder: 1 });
     res.json(categories);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.post('/categories', async (req, res) => {
+router.post('/categories', authMiddleware, async (req, res, next) => {
   try {
-    const newCategory = new Category(req.body);
+    const { name, displayOrder, isActive } = req.body;
+    let { slug } = req.body;
+    
+    if (!slug && name) {
+      slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    }
+
+    const newCategory = new Category({ name, slug, displayOrder, isActive });
     await newCategory.save();
     res.status(201).json(newCategory);
   } catch (err) {
@@ -114,36 +122,46 @@ router.post('/categories', async (req, res) => {
   }
 });
 
-router.put('/categories/:id', async (req, res) => {
+router.put('/categories/:id', authMiddleware, async (req, res, next) => {
   try {
-    const updated = await Category.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    let updateData = { ...req.body };
+    if (updateData.name && !updateData.slug) {
+      updateData.slug = updateData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    }
+    const updated = await Category.findByIdAndUpdate(req.params.id, updateData, { new: true });
+    if (!updated) return res.status(404).json({ error: 'Category not found' });
     res.json(updated);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-router.delete('/categories/:id', async (req, res) => {
+router.delete('/categories/:id', authMiddleware, async (req, res, next) => {
   try {
-    await Category.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
+    const deleted = await Category.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Category not found' });
+    res.json({ success: true, message: 'Category deleted' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-// --- MENU ITEMS CRUD ---
+// --- PRODUCTS CRUD ---
 
-router.get('/menu-items', async (req, res) => {
+router.get('/products', async (req, res, next) => {
   try {
-    const items = await MenuItem.find().populate('categoryId', 'name slug');
+    const filter = {};
+    if (req.query.category) {
+      filter.categorySlug = req.query.category;
+    }
+    const items = await MenuItem.find(filter).populate('categoryId', 'name slug');
     res.json(items);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.post('/menu-items', async (req, res) => {
+router.post('/products', authMiddleware, async (req, res, next) => {
   try {
     const newItem = new MenuItem(req.body);
     await newItem.save();
@@ -153,28 +171,34 @@ router.post('/menu-items', async (req, res) => {
   }
 });
 
-router.put('/menu-items/:id', async (req, res) => {
+router.put('/products/:id', authMiddleware, async (req, res, next) => {
   try {
     const updated = await MenuItem.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!updated) return res.status(404).json({ error: 'Product not found' });
     res.json(updated);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-router.delete('/menu-items/:id', async (req, res) => {
+router.delete('/products/:id', authMiddleware, async (req, res, next) => {
   try {
-    await MenuItem.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
+    const deleted = await MenuItem.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Product not found' });
+    res.json({ success: true, message: 'Product deleted' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.patch('/menu-items/:id/stock', async (req, res) => {
+router.patch('/products/:id/toggle-stock', authMiddleware, async (req, res, next) => {
   try {
     const { isAvailable } = req.body;
+    if (typeof isAvailable !== 'boolean') {
+      return res.status(400).json({ error: 'isAvailable must be a boolean' });
+    }
     const updated = await MenuItem.findByIdAndUpdate(req.params.id, { isAvailable }, { new: true });
+    if (!updated) return res.status(404).json({ error: 'Product not found' });
     res.json(updated);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -183,7 +207,7 @@ router.patch('/menu-items/:id/stock', async (req, res) => {
 
 // --- ANALYTICS ---
 
-router.get('/analytics', async (req, res) => {
+router.get('/analytics', authMiddleware, async (req, res) => {
   try {
     const range = req.query.range || 'today';
     let startDate = new Date();

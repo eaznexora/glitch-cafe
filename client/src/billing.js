@@ -10,7 +10,7 @@ let selectedPaymentMethod = 'UPI';
 // Fetch all orders on load
 async function fetchBills() {
   try {
-    const res = await fetch(`${API_BASE}/orders`); // Fetches all orders
+    const res = await fetch(`${API_BASE}/orders`, { headers: getAuthHeaders() }); // Fetches all orders
     if (res.ok) {
       const data = await res.json();
       
@@ -275,8 +275,9 @@ window.settleBill = async () => {
   try {
     const res = await fetch(`${API_BASE}/orders/${currentBill._id}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ 
+        status: 'COMPLETED', 
         paymentStatus: 'PAID', 
         paymentMethod: selectedPaymentMethod 
       })

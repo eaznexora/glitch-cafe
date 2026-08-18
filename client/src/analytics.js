@@ -13,7 +13,7 @@ Chart.defaults.scale.grid.color = '#f1f5f9'; // slate-100
 
 async function fetchAnalyticsData() {
   try {
-    const res = await fetch(`${API_BASE}/analytics?range=${currentRange}`);
+    const res = await fetch(`${API_BASE}/analytics?range=${currentRange}`, { headers: getAuthHeaders() });
     if (res.ok) {
       const data = await res.json();
       updateDashboard(data);
