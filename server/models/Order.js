@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 
 const orderSchema = new mongoose.Schema({
-  table: { type: String, required: true },
+  table: { type: String, required: true, default: '1' },
+  tableNumber: { type: String, default: '1' },
   customerName: { type: String },
   customerEmail: { type: String },
   orderNumber: { type: String, required: true, unique: true },

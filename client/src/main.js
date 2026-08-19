@@ -914,20 +914,38 @@ window.updateOrderStatus = async (id, newStatus, newPaymentStatus = null) => {
 };
 
 function setupSocketListeners() {
-  socket.on('order:new', (newOrder) => {
+  const handleIncomingOrder = (newOrder) => {
+    console.log('⚡ REAL-TIME INCOMING ORDER DETECTED:', newOrder);
+    
     const isDashboard = document.getElementById('kpi-revenue');
     if (isDashboard) fetchStats();
     
-    if (newOrder && newOrder._id && !seenOrderIds.has(newOrder._id)) {
-      seenOrderIds.add(newOrder._id);
-      if (audioEnabled) playKitchenBell();
-      
+    // 1. Prevent duplicates
+    const exists = allOrdersData.some(o => (o._id === newOrder._id || o.id === newOrder.id));
+    if (!exists) {
       allOrdersData.unshift(newOrder);
-      syncKitchenBellState(allOrdersData);
-      
-      updateAllUI();
+      seenOrderIds.add(newOrder._id);
     }
-  });
+
+    // 2. Re-render UI immediately
+    syncKitchenBellState(allOrdersData);
+    updateAllUI();
+
+    // 3. Trigger persistent chime if not muted
+    const isMuted = localStorage.getItem('glitch_sound_enabled') === 'false';
+    if (!isMuted && typeof playKitchenBell === 'function') {
+      playKitchenBell();
+    }
+
+    // 4. Show visual alert
+    if (typeof showToast === 'function') {
+      showToast(`🔔 New Order from Table ${newOrder.tableNumber || newOrder.table || 'N/A'}!`, 'info');
+    }
+  };
+
+  socket.on('order:new', handleIncomingOrder);
+  socket.on('new_order', handleIncomingOrder);
+  socket.on('order:created', handleIncomingOrder);
   
   socket.on('order:status_changed', (updatedOrder) => {
     const isDashboard = document.getElementById('kpi-revenue');

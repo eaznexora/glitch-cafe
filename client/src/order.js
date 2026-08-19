@@ -252,11 +252,12 @@ async function submitOrderPayload(customer) {
 
   const totalAmount = cart.reduce((sum, item) => sum + item.subtotal, 0);
 
-  const tableId = window.getTableNumber() || sessionStorage.getItem('glitch_table_id') || 'Takeaway';
+  const tableId = window.getTableNumber() || sessionStorage.getItem('glitch_table_id') || localStorage.getItem('glitch_table_num') || 'Takeaway';
+  const cleanTable = String(tableId).replace(/^Table\s*/i, '');
 
   const payload = {
-    tableNumber: tableId,
-    table: tableId,
+    tableNumber: cleanTable,
+    table: cleanTable,
     customerName: customer.name,
     customerEmail: customer.email,
     items: cart,

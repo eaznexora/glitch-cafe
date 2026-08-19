@@ -19,6 +19,8 @@ app.use(morgan('dev'));
 app.use(cors());
 app.use(express.json());
 
+app.set('io', io);
+
 // Pass io to routes
 app.use((req, res, next) => {
   req.io = io;

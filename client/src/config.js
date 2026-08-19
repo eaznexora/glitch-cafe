@@ -10,8 +10,9 @@ window.getTableNumber = function() {
   if (token) {
     try {
       const decoded = JSON.parse(atob(token));
-      if (decoded.table || decoded.tableNumber) {
-        const t = decoded.table || decoded.tableNumber;
+      if (decoded.table || decoded.tableNumber || decoded.id) {
+        const t = decoded.table || decoded.tableNumber || decoded.id;
+        localStorage.setItem('glitch_table_num', t);
         sessionStorage.setItem('glitch_table_id', t);
         sessionStorage.setItem('glitch_table', `Table ${t}`);
         return t;
@@ -23,10 +24,11 @@ window.getTableNumber = function() {
 
   const legacyTable = params.get('table');
   if (legacyTable) {
+    localStorage.setItem('glitch_table_num', legacyTable);
     sessionStorage.setItem('glitch_table_id', legacyTable);
     sessionStorage.setItem('glitch_table', `Table ${legacyTable}`);
     return legacyTable;
   }
   
-  return sessionStorage.getItem('glitch_table_id') || 'Takeaway';
+  return sessionStorage.getItem('glitch_table_id') || localStorage.getItem('glitch_table_num') || 'Takeaway';
 };

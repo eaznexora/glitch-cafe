@@ -60,6 +60,7 @@ router.post('/orders', async (req, res) => {
 
     const newOrder = new Order({
       table: tableNumber || 'Walk-in',
+      tableNumber: tableNumber || 'Walk-in',
       customerName,
       customerEmail,
       orderNumber,
@@ -71,8 +72,11 @@ router.post('/orders', async (req, res) => {
 
     await newOrder.save();
 
-    if (req.io) {
-      req.io.emit('order:new', newOrder);
+    const socketIo = req.app.get('io') || req.io;
+    if (socketIo) {
+      socketIo.emit('order:new', newOrder);
+      socketIo.emit('new_order', newOrder);
+      socketIo.emit('order:created', newOrder);
     }
 
     res.status(201).json(newOrder);
