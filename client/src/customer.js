@@ -1,8 +1,7 @@
 // customer.js
 // Logic for the mobile QR ordering web app
 
-const API_BASE = 'http://localhost:5000/api';
-const socket = io('http://localhost:5000'); // Connect to Socket.io
+const socket = io(window.location.origin, { path: window.isSubpath ? '/THE-GLITCH-CAFE/socket.io' : '/socket.io' }); // Connect to Socket.io
 
 let menuItems = [];
 let categories = [];
@@ -676,7 +675,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const viewOrderBtn = document.getElementById('btn-view-order');
   if (viewOrderBtn) {
     viewOrderBtn.onclick = () => {
-      window.location.href = 'order.html' + window.location.search;
+      window.location.href = window.BASE_PATH + '/order.html' + window.location.search;
     };
   }
   

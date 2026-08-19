@@ -1,7 +1,6 @@
 // Using Chart and io from global scope (via CDN)
 
-const API_BASE = 'http://localhost:5000/api';
-const socket = io('http://localhost:5000');
+const socket = io(window.location.origin, { path: window.isSubpath ? '/THE-GLITCH-CAFE/socket.io' : '/socket.io' });
 
 // Global state
 let salesChartInstance = null;
@@ -165,7 +164,7 @@ async function fetchStats() {
       console.warn('Session expired or unauthorized. Redirecting to login.');
       localStorage.removeItem('glitch_admin_token');
       localStorage.removeItem('adminToken');
-      window.location.href = 'login.html';
+      window.location.href = window.BASE_PATH + '/login.html';
       return;
     }
     
@@ -190,7 +189,7 @@ async function fetchChartData() {
       console.warn('Session expired or unauthorized. Redirecting to login.');
       localStorage.removeItem('glitch_admin_token');
       localStorage.removeItem('adminToken');
-      window.location.href = 'login.html';
+      window.location.href = window.BASE_PATH + '/login.html';
       return;
     }
     
@@ -220,7 +219,7 @@ async function fetchAllOrders() {
       console.warn('Session expired or unauthorized. Redirecting to login.');
       localStorage.removeItem('glitch_admin_token');
       localStorage.removeItem('adminToken');
-      window.location.href = 'login.html';
+      window.location.href = window.BASE_PATH + '/login.html';
       return;
     }
     
@@ -271,7 +270,7 @@ function renderDashboardLiveOrders(orders, container) {
     const tr = document.createElement('tr');
     tr.className = 'border-b border-gray-100 hover:bg-gray-50 transition-colors whitespace-nowrap cursor-pointer';
     tr.onclick = (e) => {
-      if(e.target.tagName !== 'BUTTON') window.location.href = 'orders.html';
+      if(e.target.tagName !== 'BUTTON') window.location.href = window.BASE_PATH + '/orders.html';
     };
     tr.innerHTML = `
       <td class="py-3 font-medium text-sm pr-4">${order.orderNumber}</td>

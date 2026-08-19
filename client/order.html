@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Glitch Cafe - Your Order</title>
+  <script src="./src/config.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -52,7 +53,7 @@
     <!-- Torn Paper Header -->
     <header class="relative w-full overflow-hidden select-none bg-cover bg-bottom bg-no-repeat pt-5 pb-8 px-4" style="background-image: url('Header.png');">
       <div class="relative z-10 flex items-center justify-between">
-        <button class="text-white p-1 hover:opacity-80 transition cursor-pointer" onclick="window.location.href='customer.html'+window.location.search">
+        <button class="text-white p-1 hover:opacity-80 transition cursor-pointer" onclick="window.location.href = window.BASE_PATH + '/customer.html'+window.location.search">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
         </button>
         <h1 class="font-extrabold italic text-white text-xl sm:text-2xl tracking-wide text-center drop-shadow-sm uppercase">The Glitch Cafe</h1>

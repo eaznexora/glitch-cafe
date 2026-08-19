@@ -1,7 +1,6 @@
 // billing.js
 // Handles Cashier & Billing features
 
-const API_BASE = 'http://localhost:3000/api'; // Same as main.js
 let allBills = [];
 let currentStatusFilter = 'all';
 let currentBill = null;

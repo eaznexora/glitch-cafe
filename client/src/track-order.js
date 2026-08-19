@@ -8,7 +8,7 @@ let pollInterval = null;
 function loadAndRenderActiveOrder() {
   const activeOrderStr = localStorage.getItem('glitch_active_order');
   if (!activeOrderStr) {
-    window.location.href = 'customer.html' + window.location.search;
+    window.location.href = window.BASE_PATH + '/customer.html' + window.location.search;
     return;
   }
 
@@ -22,7 +22,7 @@ function loadAndRenderActiveOrder() {
       startPolling();
     }
   } catch (e) {
-    window.location.href = 'customer.html' + window.location.search;
+    window.location.href = window.BASE_PATH + '/customer.html' + window.location.search;
   }
 }
 
@@ -166,7 +166,7 @@ function startPolling() {
   
   pollInterval = setInterval(async () => {
     try {
-      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/status`);
+      const res = await fetch(`${window.API_BASE}/orders/${orderId}/status`);
       if (res.ok) {
         const order = await res.json();
         

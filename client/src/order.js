@@ -51,7 +51,7 @@ function initAutoResizeNote() {
 
 async function fetchProducts() {
   try {
-    const res = await fetch('http://localhost:5000/api/products');
+    const res = await fetch('${window.API_BASE}/products');
     if (res.ok) {
       masterProducts = await res.json();
     }
@@ -112,7 +112,7 @@ function renderCart() {
     cartList.innerHTML = `
       <div class="p-8 text-center text-gray-500">
         <p class="mb-4 text-sm font-medium">Your order is empty.</p>
-        <button onclick="window.location.href='customer.html'+window.location.search" class="bg-black text-white px-5 py-2.5 rounded-lg font-bold text-sm">Browse Menu</button>
+        <button onclick="window.location.href = window.BASE_PATH + '/customer.html'+window.location.search" class="bg-black text-white px-5 py-2.5 rounded-lg font-bold text-sm">Browse Menu</button>
       </div>
     `;
     subtotalLabel.innerText = `Subtotal (0 items):`;
@@ -262,7 +262,7 @@ async function submitOrderPayload(customer) {
   };
 
   try {
-    const res = await fetch('http://localhost:5000/api/orders', {
+    const res = await fetch('${window.API_BASE}/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -309,7 +309,7 @@ function startOrderPolling(orderId) {
   
   const pollInterval = setInterval(async () => {
     try {
-      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/status`);
+      const res = await fetch(`${window.API_BASE}/orders/${orderId}/status`);
       if (res.ok) {
         const order = await res.json();
         const status = order.status.toUpperCase();
@@ -324,7 +324,7 @@ function startOrderPolling(orderId) {
           if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
           
           setTimeout(() => {
-            window.location.href = 'customer.html' + window.location.search;
+            window.location.href = window.BASE_PATH + '/customer.html' + window.location.search;
           }, 2000);
         } else if (['REJECTED', 'CANCELLED'].includes(status)) {
           clearInterval(pollInterval);
@@ -409,7 +409,7 @@ async function handleAuthRequestOTP() {
   btn.disabled = true;
 
   try {
-    const res = await fetch(`http://localhost:5000/api/customer/request-otp`, {
+    const res = await fetch(`${window.API_BASE}/customer/request-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, email })
@@ -447,7 +447,7 @@ async function handleAuthVerify() {
   btn.disabled = true;
 
   try {
-    const res = await fetch(`http://localhost:5000/api/customer/verify-otp`, {
+    const res = await fetch(`${window.API_BASE}/customer/verify-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, email: currentAuthEmail, otp })

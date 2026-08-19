@@ -12,7 +12,7 @@ let editingStaffId = null;
 
 async function fetchStaffList() {
   try {
-    const res = await fetch('http://localhost:5000/api/auth/staff', {
+    const res = await fetch('${window.API_BASE}/auth/staff', {
       headers: getAuthHeaders()
     });
     if (res.ok) {
@@ -122,7 +122,7 @@ window.saveStaffMember = async () => {
   }
 
   try {
-    const url = editingStaffId ? `http://localhost:5000/api/auth/staff/${editingStaffId}` : 'http://localhost:5000/api/auth/staff';
+    const url = editingStaffId ? `${window.API_BASE}/auth/staff/${editingStaffId}` : '${window.API_BASE}/auth/staff';
     const method = editingStaffId ? 'PUT' : 'POST';
 
     const res = await fetch(url, {

@@ -11,7 +11,7 @@ function checkAuth() {
 
   if (!token) {
     if (!isLoginPage) {
-      window.location.href = 'login.html';
+      window.location.href = window.BASE_PATH + '/login.html';
     }
     return null;
   }
@@ -19,13 +19,13 @@ function checkAuth() {
   try {
     const user = JSON.parse(localStorage.getItem('adminUser'));
     if (isLoginPage && user) {
-      window.location.href = 'index.html'; // Already logged in
+      window.location.href = window.BASE_PATH + '/index.html'; // Already logged in
     }
     return user;
   } catch (e) {
     localStorage.removeItem('adminToken');
     localStorage.removeItem('adminUser');
-    window.location.href = 'login.html';
+    window.location.href = window.BASE_PATH + '/login.html';
     return null;
   }
 }
@@ -33,7 +33,7 @@ function checkAuth() {
 function logout() {
   localStorage.removeItem('adminToken');
   localStorage.removeItem('adminUser');
-  window.location.href = 'login.html';
+  window.location.href = window.BASE_PATH + '/login.html';
 }
 
 function getAuthHeaders() {

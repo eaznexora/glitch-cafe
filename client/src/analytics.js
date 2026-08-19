@@ -1,7 +1,6 @@
 // analytics.js
 // Handles fetching data and rendering Chart.js for the Analytics view
 
-const API_BASE = 'http://localhost:3000/api'; // Same as main.js
 let currentRange = 'today';
 let revenueChartInstance = null;
 let peakChartInstance = null;
