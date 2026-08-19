@@ -1,26 +1,32 @@
 const mongoose = require('mongoose');
 
 const orderSchema = new mongoose.Schema({
-  tableId: { type: mongoose.Schema.Types.ObjectId, ref: 'Table', required: true },
+  table: { type: String, required: true },
+  customerName: { type: String },
+  customerEmail: { type: String },
   orderNumber: { type: String, required: true, unique: true },
   items: [{
-    menuItemId: { type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem', required: true },
+    menuItemId: { type: String },
     name: { type: String, required: true },
     price: { type: Number, required: true },
     quantity: { type: Number, required: true, min: 1 },
-    notes: { type: String }
+    size: { type: String },
+    toppings: [{ type: String }],
+    notes: { type: String },
+    subtotal: { type: Number, required: true },
+    status: { type: String, enum: ['Accepted', 'Cancelled', 'Pending'], default: 'Pending' }
   }],
   status: { 
     type: String, 
-    enum: ['PENDING', 'ACCEPTED', 'PREPARING', 'READY_TO_SERVE', 'SERVED', 'COMPLETED', 'REJECTED'],
+    enum: ['PENDING', 'ACCEPTED', 'PREPARING', 'READY_TO_SERVE', 'SERVED', 'COMPLETED', 'REJECTED', 'CANCELLED'],
     default: 'PENDING'
   },
   rejectionReason: { type: String },
+  cancellationReason: { type: String },
   paymentStatus: { type: String, enum: ['UNPAID', 'PAID'], default: 'UNPAID' },
   paymentMethod: { type: String, enum: ['UPI', 'CASH', 'CARD', null], default: null },
-  subtotal: { type: Number, required: true },
-  tax: { type: Number, required: true },
-  totalAmount: { type: Number, required: true }
+  totalAmount: { type: Number, required: true },
+  note: { type: String }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Order', orderSchema);

@@ -37,7 +37,7 @@ function logout() {
 }
 
 function getAuthHeaders() {
-  const token = localStorage.getItem('adminToken');
+  const token = localStorage.getItem('glitch_admin_token') || localStorage.getItem('adminToken') || localStorage.getItem('token') || localStorage.getItem('glitch_token');
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`

@@ -9,9 +9,39 @@ let allOrdersData = [];
 let audioEnabled = false;
 let orderToReject = null;
 let currentOrdersFilter = 'all';
+let seenOrderIds = new Set();
+let bellInterval = null;
 
-const alertSound = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
+function syncKitchenBellState(orders) {
+  const hasPending = orders.some(o => (o.status || '').toUpperCase() === 'PENDING');
+  
+  if (hasPending) {
+    if (!bellInterval) {
+      if (audioEnabled) playKitchenBell(); // Immediate first chime
+      bellInterval = setInterval(() => {
+        if (audioEnabled) playKitchenBell();
+      }, 1500); // Rings every 1.5 seconds
+    }
+  } else {
+    if (bellInterval) {
+      clearInterval(bellInterval);
+      bellInterval = null;
+    }
+  }
+}
 
+let audioCtx = null;
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+window.addEventListener('click', initAudio, { once: true });
+window.addEventListener('keydown', initAudio, { once: true });
 async function init() {
   const isDashboard = document.getElementById('kpi-revenue');
   if (isDashboard) {
@@ -46,20 +76,65 @@ window.toggleSidebar = () => {
 window.toggleAudio = () => {
   audioEnabled = !audioEnabled;
   const icon = document.getElementById('audio-icon');
-  if (icon) {
-    if (audioEnabled) {
-      icon.setAttribute('data-lucide', 'volume-2');
-      alertSound.play().catch(e => console.log('Audio requires interaction first'));
-    } else {
-      icon.setAttribute('data-lucide', 'volume-x');
+  
+  if (audioEnabled) {
+    // Initialize AudioContext on user interaction
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
-    lucide.createIcons();
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    
+    if (icon) {
+      icon.setAttribute('data-lucide', 'volume-2');
+      lucide.createIcons();
+    }
+    
+    playKitchenBell(); // Test chime
+  } else {
+    if (icon) {
+      icon.setAttribute('data-lucide', 'volume-x');
+      lucide.createIcons();
+    }
   }
 };
 
-function playAlert() {
-  if (audioEnabled) {
-    alertSound.play().catch(e => console.log('Audio playback failed', e));
+function playKitchenBell() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioContext();
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+
+    const now = ctx.currentTime;
+    
+    // High Ding (1046.50 Hz - C6)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'triangle';
+    osc1.frequency.setValueAtTime(1046.50, now);
+    gain1.gain.setValueAtTime(1, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.8);
+
+    // Resonant Ding (1318.51 Hz - E6)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(1318.51, now + 0.15);
+    gain2.gain.setValueAtTime(1, now + 0.15);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.15);
+    osc2.stop(now + 1.2);
+  } catch (e) {
+    console.warn('Audio play error:', e);
   }
 }
 
@@ -85,6 +160,15 @@ function updateTicketTimers() {
 async function fetchStats() {
   try {
     const res = await fetch(`${API_BASE}/dashboard/stats`, { headers: getAuthHeaders() });
+    
+    if (res.status === 401) {
+      console.warn('Session expired or unauthorized. Redirecting to login.');
+      localStorage.removeItem('glitch_admin_token');
+      localStorage.removeItem('adminToken');
+      window.location.href = 'login.html';
+      return;
+    }
+    
     const data = await res.json();
     if (res.ok) {
       document.getElementById('kpi-revenue').innerText = `₹${data.revenue.toLocaleString()}`;
@@ -101,6 +185,15 @@ async function fetchStats() {
 async function fetchChartData() {
   try {
     const res = await fetch(`${API_BASE}/dashboard/chart-data?range=today`, { headers: getAuthHeaders() });
+    
+    if (res.status === 401) {
+      console.warn('Session expired or unauthorized. Redirecting to login.');
+      localStorage.removeItem('glitch_admin_token');
+      localStorage.removeItem('adminToken');
+      window.location.href = 'login.html';
+      return;
+    }
+    
     const data = await res.json();
     if (res.ok) {
       const ctx = document.getElementById('salesChart').getContext('2d');
@@ -122,9 +215,20 @@ async function fetchChartData() {
 async function fetchAllOrders() {
   try {
     const res = await fetch(`${API_BASE}/orders`, { headers: getAuthHeaders() });
+    
+    if (res.status === 401) {
+      console.warn('Session expired or unauthorized. Redirecting to login.');
+      localStorage.removeItem('glitch_admin_token');
+      localStorage.removeItem('adminToken');
+      window.location.href = 'login.html';
+      return;
+    }
+    
     const data = await res.json();
     if (res.ok) {
       allOrdersData = data;
+      
+      syncKitchenBellState(data);
       
       const liveOrdersBody = document.getElementById('live-orders-body');
       if (liveOrdersBody) {
@@ -282,8 +386,17 @@ function renderMasterOrders(orders) {
     }
 
     const tr = document.createElement('tr');
-    tr.className = 'hover:bg-gray-50 transition-colors cursor-pointer group';
-    tr.onclick = () => openOrderDrawer(order._id);
+    tr.className = 'transition-colors cursor-pointer group ';
+    if (order.status === 'PENDING') {
+      tr.className += 'bg-yellow-50/50 hover:bg-yellow-50 relative animate-[pulse_2s_ease-in-out_infinite] ring-1 ring-inset ring-yellow-400';
+    } else {
+      tr.className += 'hover:bg-gray-50';
+    }
+    
+    tr.onclick = () => {
+      if (order.status === 'PENDING') openIncomingOrderModal(order._id);
+      else openOrderDrawer(order._id);
+    };
     tr.innerHTML = `
       <td class="px-6 py-4 align-top">
         <div class="font-bold text-sm text-monochrome-900 group-hover:underline">${order.orderNumber}</div>
@@ -324,17 +437,24 @@ window.openOrderDrawer = (orderId) => {
   const content = document.getElementById('drawer-content');
   const actions = document.getElementById('drawer-actions');
 
-  const tableNumber = order.tableId ? order.tableId.tableNumber : 'N/A';
+  const tableNumber = order.tableId ? order.tableId.tableNumber : order.table || 'Walk-in';
   const timestamp = new Date(order.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
   const isPaid = order.paymentStatus === 'PAID';
 
-  let itemsHtml = order.items.map(item => `
-    <div class="flex justify-between items-start py-3 border-b border-gray-100 last:border-0">
-      <div>
+  let itemsHtml = order.items.map((item, index) => `
+    <div class="flex justify-between items-start py-3 border-b border-gray-100 last:border-0" id="drawer-item-${order._id}-${index}">
+      <div class="flex-1">
         <div class="font-medium text-sm"><span class="text-gray-500 mr-2">${item.quantity}x</span>${item.name}</div>
         ${item.notes ? `<div class="text-xs text-red-500 italic mt-0.5">${item.notes}</div>` : ''}
       </div>
-      <div class="text-sm font-medium">₹${(item.price * item.quantity).toFixed(2)}</div>
+      <div class="text-sm font-medium flex items-center gap-3">
+        ₹${(Number(item.subtotal) || (Number(item.price) * Number(item.quantity)) || 0).toFixed(2)}
+        ${order.status === 'PENDING' ? `
+          <button class="text-red-500 hover:bg-red-50 p-1 rounded transition-colors" onclick="removeOrderItem('${order._id}', ${index})" title="Remove Item">
+            <i data-lucide="trash-2" class="h-4 w-4"></i>
+          </button>
+        ` : ''}
+      </div>
     </div>
   `).join('');
 
@@ -359,18 +479,33 @@ window.openOrderDrawer = (orderId) => {
     </div>
 
     <div class="border-t border-gray-200 pt-4 space-y-2">
-      <div class="flex justify-between text-sm text-gray-500"><span>Subtotal</span> <span>₹${order.subtotal.toFixed(2)}</span></div>
-      <div class="flex justify-between text-sm text-gray-500"><span>Taxes (5%)</span> <span>₹${order.tax.toFixed(2)}</span></div>
-      <div class="flex justify-between font-bold text-lg pt-2 mt-2 border-t border-gray-200 text-black"><span>Total</span> <span>₹${order.totalAmount.toFixed(2)}</span></div>
+      <div class="flex justify-between text-sm text-gray-500"><span>Subtotal</span> <span>₹${(Number(order.subtotal) || Number(order.totalAmount) || 0).toFixed(2)}</span></div>
+      <div class="flex justify-between text-sm text-gray-500"><span>Taxes (5%)</span> <span>₹${(Number(order.tax) || 0).toFixed(2)}</span></div>
+      <div class="flex justify-between font-bold text-lg pt-2 mt-2 border-t border-gray-200 text-black"><span>Total</span> <span>₹${(Number(order.totalAmount) || 0).toFixed(2)}</span></div>
     </div>
   `;
 
-  actions.innerHTML = `
+  let actionsHtml = `
     <button class="w-full bg-monochrome-900 text-white font-bold py-3 rounded hover:bg-monochrome-800 transition-colors flex items-center justify-center" onclick="alert('Printing KOT / Receipt...')">
       <i data-lucide="printer" class="h-4 w-4 mr-2"></i> Print Receipt
     </button>
     ${!isPaid && order.status !== 'REJECTED' ? `<button class="w-full mt-3 bg-white border border-gray-300 text-monochrome-900 font-bold py-3 rounded hover:bg-gray-50 transition-colors" onclick="updateOrderStatus('${order._id}', null, 'PAID')">Mark as Paid</button>` : ''}
   `;
+
+  if (order.status === 'PENDING') {
+    actionsHtml = `
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <button class="w-full bg-[#09090b] text-white py-3 rounded text-sm font-bold hover:bg-gray-800 transition-colors shadow-sm" onclick="acceptOrder('${order._id}')">Accept Order</button>
+        <button class="w-full bg-white border border-gray-300 text-gray-700 py-3 rounded text-sm font-bold hover:bg-gray-50 transition-colors shadow-sm" onclick="openRejectionModal('${order._id}', '${order.orderNumber}')">Reject Order</button>
+      </div>
+    ` + actionsHtml;
+  } else if (order.status === 'PREPARING') {
+    actionsHtml = `<button class="w-full mb-3 bg-[#09090b] text-white py-3 rounded text-sm font-bold hover:bg-gray-800 transition-colors shadow-sm" onclick="updateOrderStatus('${order._id}', 'READY_TO_SERVE')">Mark Ready to Serve</button>` + actionsHtml;
+  } else if (order.status === 'READY_TO_SERVE') {
+    actionsHtml = `<button class="w-full mb-3 bg-white border-2 border-[#09090b] text-[#09090b] py-3 rounded text-sm font-bold hover:bg-gray-50 transition-colors shadow-sm" onclick="updateOrderStatus('${order._id}', 'COMPLETED')">Mark Served / Completed</button>` + actionsHtml;
+  }
+
+  actions.innerHTML = actionsHtml;
 
   if (typeof lucide !== 'undefined') lucide.createIcons();
   
@@ -378,11 +513,219 @@ window.openOrderDrawer = (orderId) => {
   backdrop.classList.remove('hidden');
 };
 
+window.removeOrderItem = (orderId, itemIndex) => {
+  const order = allOrdersData.find(o => o._id === orderId);
+  if (!order) return;
+  
+  if (order.items.length <= 1) {
+    alert("Cannot remove the only item. Reject the order instead.");
+    return;
+  }
+  
+  if (!confirm("Are you sure you want to remove this item? It will be marked as out of stock for this order.")) return;
+  
+  // Mutate local state and recalculate
+  order.items.splice(itemIndex, 1);
+  order.subtotal = order.items.reduce((sum, item) => sum + (item.subtotal || (item.price * item.quantity)), 0);
+  order.tax = order.subtotal * 0.05;
+  order.totalAmount = order.subtotal + order.tax;
+  
+  // Re-render drawer
+  openOrderDrawer(orderId);
+};
+
+window.acceptOrder = async (orderId) => {
+  const order = allOrdersData.find(o => o._id === orderId);
+  if (!order) return;
+  
+  try {
+    await fetch(`${API_BASE}/orders/${orderId}/accept`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ 
+        acceptedItems: order.items, 
+        subtotal: order.subtotal,
+        totalAmount: order.totalAmount 
+      })
+    });
+    closeOrderDrawer();
+  } catch (err) {
+    console.error("Failed to accept order", err);
+  }
+};
+
 window.closeOrderDrawer = () => {
   const drawer = document.getElementById('order-drawer');
   const backdrop = document.getElementById('drawer-backdrop');
   if (drawer) drawer.classList.add('translate-x-full');
   if (backdrop) backdrop.classList.add('hidden');
+};
+
+// ----------------- INCOMING ORDER MODAL ----------------- //
+
+window.openIncomingOrderModal = (orderId) => {
+  const order = allOrdersData.find(o => o._id === orderId);
+  if (!order) return;
+  
+  const modal = document.getElementById('incoming-order-modal');
+  const backdrop = document.getElementById('incoming-order-backdrop');
+  if (!modal || !backdrop) return;
+  
+  // Populate Headers
+  document.getElementById('incoming-order-number').innerText = order.orderNumber;
+  document.getElementById('incoming-table').innerText = order.tableId ? order.tableId.tableNumber : order.table || 'Walk-in';
+  document.getElementById('incoming-customer').innerText = order.customerName || 'Guest';
+  
+  // Note
+  const noteContainer = document.getElementById('incoming-note-container');
+  if (order.note) {
+    document.getElementById('incoming-note').innerText = order.note;
+    noteContainer.classList.remove('hidden');
+  } else {
+    noteContainer.classList.add('hidden');
+  }
+  
+  // Items
+  const itemsList = document.getElementById('incoming-items-list');
+  let itemsHtml = '';
+  order.items.forEach((item, index) => {
+    const toppingsStr = Array.isArray(item.toppings) && item.toppings.length ? item.toppings.join(', ') : 'None';
+    itemsHtml += `
+      <label class="flex items-center justify-between p-3.5 rounded-2xl bg-neutral-50 border border-neutral-200 hover:border-neutral-300 transition-all cursor-pointer">
+        <div class="flex items-center gap-3.5">
+          <input 
+            type="checkbox" 
+            checked 
+            data-index="${index}" 
+            class="incoming-item-checkbox w-5 h-5 rounded-md text-emerald-600 focus:ring-emerald-500 border-neutral-300 cursor-pointer accent-emerald-600"
+            onchange="recalculateIncomingTotal('${orderId}')"
+          />
+          <div>
+            <p class="text-sm font-bold text-neutral-900 leading-snug">
+              ${item.name} <span class="text-xs font-normal text-neutral-500">(${item.size || 'Regular'})</span>
+            </p>
+            <p class="text-xs text-neutral-500 mt-0.5">Extras: ${toppingsStr}</p>
+          </div>
+        </div>
+        <div class="text-right">
+          <p class="text-sm font-bold text-neutral-900">₹${((Number(item.price) || 0) * (Number(item.quantity) || 1)).toFixed(2)}</p>
+          <span class="text-xs text-neutral-400">Qty: ${item.quantity || 1}</span>
+        </div>
+      </label>
+    `;
+  });
+  itemsList.innerHTML = itemsHtml;
+  
+  // Actions
+  document.getElementById('btn-reject-entire').onclick = () => rejectEntireIncomingOrder(orderId);
+  document.getElementById('btn-accept-selective').onclick = () => acceptSelectiveIncomingOrder(orderId);
+  
+  // Total
+  recalculateIncomingTotal(orderId);
+  
+  // Open
+  backdrop.classList.remove('hidden');
+  modal.classList.remove('hidden');
+};
+
+window.closeIncomingOrderModal = () => {
+  const modal = document.getElementById('incoming-order-modal');
+  const backdrop = document.getElementById('incoming-order-backdrop');
+  if (modal) modal.classList.add('hidden');
+  if (backdrop) backdrop.classList.add('hidden');
+};
+
+window.recalculateIncomingTotal = (orderId) => {
+  const order = allOrdersData.find(o => o._id === orderId);
+  if (!order) return;
+  
+  const checkboxes = document.querySelectorAll('.incoming-item-checkbox');
+  let newSubtotal = 0;
+  
+  checkboxes.forEach(cb => {
+    if (cb.checked) {
+      const idx = parseInt(cb.getAttribute('data-index'));
+      const item = order.items[idx];
+      newSubtotal += (item.subtotal || (item.price * item.quantity));
+    }
+  });
+  
+  const newTax = newSubtotal * 0.05;
+  const newTotal = newSubtotal + newTax;
+  
+  document.getElementById('incoming-total').innerText = `₹${newTotal.toFixed(2)}`;
+  
+  const acceptBtn = document.getElementById('btn-accept-selective');
+  if (acceptBtn) {
+    acceptBtn.innerText = `Accept Order (₹${newTotal.toFixed(2)})`;
+    acceptBtn.disabled = newTotal === 0;
+    if (newTotal === 0) {
+      acceptBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    } else {
+      acceptBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+  }
+};
+
+window.rejectEntireIncomingOrder = async (orderId) => {
+  const order = allOrdersData.find(o => o._id === orderId);
+  if (!order) return;
+  
+  if (!confirm('Are you sure you want to reject this entire order?')) return;
+  
+  try {
+    await fetch(`${API_BASE}/orders/${orderId}/status`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ status: 'REJECTED', rejectionReason: 'Order Declined' })
+    });
+    closeIncomingOrderModal();
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+window.acceptSelectiveIncomingOrder = async (orderId) => {
+  const order = allOrdersData.find(o => o._id === orderId);
+  if (!order) return;
+  
+  const checkboxes = document.querySelectorAll('.incoming-item-checkbox');
+  let acceptedItemIndices = [];
+  let rejectedItemIndices = [];
+  let newSubtotal = 0;
+  
+  checkboxes.forEach(cb => {
+    const idx = parseInt(cb.getAttribute('data-index'));
+    if (cb.checked) {
+      acceptedItemIndices.push(idx);
+      const item = order.items[idx];
+      newSubtotal += (item.subtotal || (item.price * item.quantity));
+    } else {
+      rejectedItemIndices.push(idx);
+    }
+  });
+  
+  if (acceptedItemIndices.length === 0) {
+    return rejectEntireIncomingOrder(orderId);
+  }
+  
+  const newTax = newSubtotal * 0.05;
+  const newTotal = newSubtotal + newTax;
+  
+  try {
+    await fetch(`${API_BASE}/orders/${orderId}/accept-selective`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ 
+        acceptedItemIndices, 
+        rejectedItemIndices, 
+        updatedTotal: newTotal 
+      })
+    });
+    closeIncomingOrderModal();
+  } catch (err) {
+    console.error(err);
+  }
 };
 
 // ----------------- KDS LOGIC ----------------- //
@@ -428,7 +771,9 @@ function renderKdsTickets(orders, container) {
     let borderColor = 'border-gray-200';
     let badgeColor = 'bg-[#09090b] text-white';
     
-    if (order.status === 'PENDING') borderColor = 'border-[#09090b]'; 
+    if (order.status === 'PENDING') {
+      borderColor = 'border-yellow-400 ring-2 ring-yellow-400 animate-[pulse_2s_ease-in-out_infinite]'; 
+    }
     else if (order.status === 'READY_TO_SERVE') { borderColor = 'border-green-600'; badgeColor = 'bg-green-600 text-white'; }
 
     const card = document.createElement('div');
@@ -442,10 +787,12 @@ function renderKdsTickets(orders, container) {
 
     let actionButtons = '';
     if (order.status === 'PENDING') {
+      card.classList.add('cursor-pointer');
+      card.onclick = () => openIncomingOrderModal(order._id);
+      
       actionButtons = `
-        <div class="grid grid-cols-2 gap-2 mt-4">
-          <button class="bg-[#09090b] text-white py-2 rounded text-sm font-medium hover:bg-gray-800 transition-colors" onclick="updateOrderStatus('${order._id}', 'PREPARING')">Accept Order</button>
-          <button class="bg-white border border-[#09090b] text-[#09090b] py-2 rounded text-sm font-medium hover:bg-gray-50 transition-colors" onclick="openRejectionModal('${order._id}', '${order.orderNumber}')">Reject</button>
+        <div class="grid grid-cols-2 gap-2 mt-4 pointer-events-none">
+          <button class="bg-[#09090b] text-white py-2 rounded text-sm font-medium hover:bg-gray-800 transition-colors">Review Order</button>
         </div>
       `;
     } else if (order.status === 'PREPARING') {
@@ -527,12 +874,16 @@ window.updateOrderStatus = async (id, newStatus, newPaymentStatus = null) => {
 };
 
 function setupSocketListeners() {
-  socket.on('order:created', (newOrder) => {
+  socket.on('order:new', (newOrder) => {
     const isDashboard = document.getElementById('kpi-revenue');
     if (isDashboard) fetchStats();
     
+    if (newOrder && newOrder._id && !seenOrderIds.has(newOrder._id)) {
+      seenOrderIds.add(newOrder._id);
+      if (audioEnabled) playKitchenBell();
+    }
+    
     fetchAllOrders(); // Reload everything (realtime)
-    playAlert(); 
   });
   socket.on('order:status_changed', () => {
     const isDashboard = document.getElementById('kpi-revenue');

@@ -36,9 +36,9 @@
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="./src/auth.js"></script>
-  <script src="./src/auth.js"></script>
-<script src="./src/sidebar.js"></script>
+    <script src="./src/sidebar.js"></script>
 </head>
   <body class="flex h-screen overflow-hidden bg-monochrome-100 text-monochrome-900 font-sans relative">
     
@@ -94,19 +94,16 @@
         </div>
       </header>
 
-      <main class="flex-1 overflow-y-auto p-4 lg:p-8 flex items-center justify-center">
-        <div class="bg-monochrome-white p-12 rounded-xl shadow-sm border border-gray-200 text-center max-w-md w-full">
-          <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6 border border-gray-100">
-            <i data-lucide="lock" class="h-8 w-8 text-monochrome-900"></i>
+      <main class="flex-1 overflow-y-auto p-4 lg:p-8">
+        <div class="flex items-center justify-between mb-8">
+          <div>
+            <h2 class="text-2xl font-bold text-monochrome-900">Table QR Generator</h2>
+            <p class="text-gray-500 mt-1">Generate and download QR codes for your tables.</p>
           </div>
-          <h3 class="text-2xl font-bold text-monochrome-900 mb-4">Feature Unavailable</h3>
-          <p class="text-gray-600 mb-8 leading-relaxed">
-            This feature is not available at this moment.<br>
-            Please contact <strong>Eaz Nexora</strong> to unlock custom QR table configuration.
-          </p>
-          <a href="#" class="btn-primary w-full inline-flex justify-center items-center py-3 text-sm font-medium">
-            Contact Eaz Nexora <i data-lucide="external-link" class="h-4 w-4 ml-2"></i>
-          </a>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6" id="tables-grid">
+          <!-- Tables will be injected by tables.js -->
         </div>
       </main>
     </div>
@@ -122,6 +119,7 @@
         }
       };
     </script>
+    <script src="./src/tables.js"></script>
   </body>
 </html>
 

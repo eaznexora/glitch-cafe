@@ -48,13 +48,66 @@ router.get('/dashboard/chart-data', authMiddleware, async (req, res) => {
   }
 });
 
-// Get Live Orders
+// Create New Order
+router.post('/orders', async (req, res) => {
+  try {
+    const { tableNumber, customerName, customerEmail, items, totalAmount, note } = req.body;
+    
+    // Generate simple order number (e.g., ORD-1234)
+    // Generate sequential order number
+    const count = await Order.countDocuments();
+    const orderNumber = `ORD-${String(count + 1).padStart(4, '0')}`;
+
+    const newOrder = new Order({
+      table: tableNumber || 'Walk-in',
+      customerName,
+      customerEmail,
+      orderNumber,
+      items,
+      totalAmount,
+      note,
+      status: 'PENDING'
+    });
+
+    await newOrder.save();
+
+    if (req.io) {
+      req.io.emit('order:new', newOrder);
+    }
+
+    res.status(201).json(newOrder);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get Live Orders (all active)
 router.get('/orders/live', authMiddleware, async (req, res) => {
   try {
-    const activeOrders = await Order.find({ status: { $nin: ['COMPLETED', 'REJECTED'] } })
-      .populate('tableId', 'tableNumber')
+    const activeOrders = await Order.find({ status: { $nin: ['COMPLETED', 'REJECTED', 'CANCELLED'] } })
       .sort({ createdAt: -1 });
     res.json(activeOrders);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get Pending Orders (for Kitchen Alerts)
+router.get('/orders/pending', authMiddleware, async (req, res) => {
+  try {
+    const pendingOrders = await Order.find({ status: 'PENDING' }).sort({ createdAt: 1 });
+    res.json(pendingOrders);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get Order Status (for Customer Tracker)
+router.get('/orders/:id/status', async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id, 'status rejectionReason cancellationReason updatedAt');
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    res.json(order);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -64,7 +117,6 @@ router.get('/orders/live', authMiddleware, async (req, res) => {
 router.get('/orders', authMiddleware, async (req, res) => {
   try {
     const allOrders = await Order.find()
-      .populate('tableId', 'tableNumber')
       .sort({ createdAt: -1 });
     res.json(allOrders);
   } catch (err) {
@@ -75,13 +127,17 @@ router.get('/orders', authMiddleware, async (req, res) => {
 // Update Order Status
 router.patch('/orders/:id/status', authMiddleware, async (req, res) => {
   try {
-    const { status, paymentStatus, paymentMethod } = req.body;
+    const { status, paymentStatus, paymentMethod, rejectionReason, cancellationReason, items, totalAmount } = req.body;
     const update = {};
     if (status) update.status = status;
     if (paymentStatus) update.paymentStatus = paymentStatus;
     if (paymentMethod) update.paymentMethod = paymentMethod;
+    if (rejectionReason) update.rejectionReason = rejectionReason;
+    if (cancellationReason) update.cancellationReason = cancellationReason;
+    if (items) update.items = items;
+    if (totalAmount !== undefined) update.totalAmount = totalAmount;
 
-    const order = await Order.findByIdAndUpdate(req.params.id, update, { new: true }).populate('tableId', 'tableNumber');
+    const order = await Order.findByIdAndUpdate(req.params.id, update, { new: true });
     
     // Emit socket event (req.io is passed from server.js)
     if (req.io) {
@@ -93,6 +149,76 @@ router.patch('/orders/:id/status', authMiddleware, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Selective Item Acceptance
+router.patch('/orders/:id/accept', authMiddleware, async (req, res) => {
+  try {
+    const { acceptedItems, totalAmount } = req.body;
+    
+    if (!acceptedItems || acceptedItems.length === 0) {
+      // If all items were removed, reject the order automatically
+      const order = await Order.findByIdAndUpdate(
+        req.params.id,
+        { status: 'REJECTED', rejectionReason: 'All items out of stock' },
+        { new: true }
+      ).populate('tableId', 'tableNumber');
+      
+      if (req.io) req.io.emit('order:status_changed', order);
+      return res.json(order);
+    }
+    
+    const subtotal = acceptedItems.reduce((sum, item) => sum + (item.subtotal || (item.price * item.quantity)), 0);
+    const tax = subtotal * 0.05;
+    const finalTotal = totalAmount !== undefined ? totalAmount : subtotal + tax;
+
+    const order = await Order.findByIdAndUpdate(
+      req.params.id,
+      { 
+        items: acceptedItems,
+        subtotal: subtotal,
+        tax: tax,
+        totalAmount: finalTotal,
+        status: 'PREPARING'
+      },
+      { new: true }
+    ).populate('tableId', 'tableNumber');
+
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    
+    if (req.io) req.io.emit('order:status_changed', order);
+    res.json(order);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch('/orders/:id/accept-selective', authMiddleware, async (req, res) => {
+  try {
+    const { acceptedItemIndices, rejectedItemIndices, updatedTotal } = req.body;
+    
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    
+    order.items = order.items.map((item, idx) => ({
+      ...item.toObject(),
+      status: acceptedItemIndices.includes(idx) ? 'Accepted' : 'Cancelled'
+    }));
+    
+    order.status = acceptedItemIndices.length > 0 ? 'PREPARING' : 'CANCELLED';
+    if (updatedTotal !== undefined) {
+      order.totalAmount = updatedTotal;
+    }
+    
+    await order.save();
+    
+    if (req.io) req.io.emit('order:status_changed', order);
+    res.json(order);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 
 // --- CATEGORIES CRUD ---
 

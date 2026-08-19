@@ -5,8 +5,8 @@ let masterProducts = [];
 document.addEventListener('DOMContentLoaded', async () => {
   initURLParams();
   setOrderGreeting();
+  await fetchProducts(); // Fetch products first so renderCart has toppings data
   loadCart();
-  await fetchProducts();
   renderCart();
   initAutoResizeNote();
 });
@@ -269,9 +269,28 @@ async function submitOrderPayload(customer) {
     });
     
     if (res.ok) {
-      localStorage.removeItem('glitch_cart');
-      alert('Order Placed Successfully!');
-      window.location.href = 'customer.html' + window.location.search;
+      const createdOrder = await res.json();
+      // Store active order but do NOT clear cart yet
+      const noteInput = document.getElementById('order-note');
+      localStorage.setItem('glitch_active_order', JSON.stringify({
+        orderId: createdOrder._id,
+        status: createdOrder.status || 'PENDING',
+        items: cart,
+        note: noteInput ? noteInput.value : '',
+        totals: { totalAmount }
+      }));
+      
+      // Morph button to Waiting state
+      btn.className = 'w-full bg-neutral-900 text-white font-semibold py-4 px-6 rounded-2xl flex items-center justify-center gap-3 cursor-not-allowed';
+      btn.innerHTML = `
+        <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>Accepting your order...</span>
+      `;
+      
+      startOrderPolling(createdOrder._id);
     } else {
       const err = await res.json();
       alert(`Error placing order: ${err.error || 'Unknown error'}`);
@@ -283,6 +302,43 @@ async function submitOrderPayload(customer) {
     btn.innerText = 'Place Order';
     btn.disabled = false;
   }
+}
+
+function startOrderPolling(orderId) {
+  const btn = document.getElementById('btn-place-order');
+  
+  const pollInterval = setInterval(async () => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/status`);
+      if (res.ok) {
+        const order = await res.json();
+        const status = order.status.toUpperCase();
+        
+        if (['ACCEPTED', 'PREPARING'].includes(status)) {
+          clearInterval(pollInterval);
+          
+          btn.className = 'w-full bg-emerald-600 text-white font-semibold py-4 px-6 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20';
+          btn.innerHTML = `<span>Order Accepted ✓</span>`;
+          
+          localStorage.removeItem('glitch_cart');
+          if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+          
+          setTimeout(() => {
+            window.location.href = 'customer.html' + window.location.search;
+          }, 2000);
+        } else if (['REJECTED', 'CANCELLED'].includes(status)) {
+          clearInterval(pollInterval);
+          
+          btn.className = 'w-full bg-red-600 text-white font-semibold py-4 px-6 rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed';
+          btn.innerHTML = `<span>Order Declined ✕</span>`;
+          
+          alert('Your order could not be accepted by the kitchen.');
+        }
+      }
+    } catch (err) {
+      console.error('Polling error', err);
+    }
+  }, 2500);
 }
 
 // Checkout Auth Logic

@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setGreeting();
   initCustomerAuth();
   fetchMenu();
+  checkActiveOrderPill();
   
   // Event Delegation for dynamically rendered Add buttons
   const menuContainer = document.getElementById('menu-container');
@@ -50,7 +51,6 @@ function initURLParams() {
   const table = params.get('table');
   if (table) {
     currentTable = table;
-    document.getElementById('header-table').innerText = `Table ${table}`;
   }
 }
 
@@ -59,7 +59,38 @@ function setGreeting() {
   let greeting = 'Good Evening';
   if (hour < 12) greeting = 'Good Morning';
   else if (hour < 17) greeting = 'Good Afternoon';
-  document.getElementById('header-greeting').innerText = greeting;
+  
+  const greetingEl = document.getElementById('header-greeting');
+  if (greetingEl) greetingEl.innerText = greeting;
+}
+
+function checkActiveOrderPill() {
+  const trackerPill = document.getElementById('active-order-tracker');
+  const statusText = document.getElementById('tracker-status-text');
+  if (!trackerPill || !statusText) return;
+  
+  const activeOrderStr = localStorage.getItem('glitch_active_order');
+  if (activeOrderStr) {
+    try {
+      const activeOrder = JSON.parse(activeOrderStr);
+      const status = activeOrder.status?.toUpperCase() || 'PENDING';
+      
+      if (['PENDING', 'PREPARING', 'READY_TO_SERVE'].includes(status)) {
+        let displayStatus = 'Preparing';
+        if (status === 'PENDING') displayStatus = 'Awaiting Kitchen';
+        if (status === 'READY_TO_SERVE') displayStatus = 'Ready to Serve!';
+        
+        statusText.innerText = `Active Order: ${displayStatus}`;
+        trackerPill.classList.remove('hidden');
+      } else {
+        trackerPill.classList.add('hidden');
+      }
+    } catch (e) {
+      trackerPill.classList.add('hidden');
+    }
+  } else {
+    trackerPill.classList.add('hidden');
+  }
 }
 
 async function fetchMenu() {

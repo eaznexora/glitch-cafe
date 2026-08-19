@@ -95,6 +95,7 @@
             <h2 class="text-xl font-bold text-monochrome-900">Live Orders & Kitchen Display</h2>
           </div>
           <div class="flex items-center space-x-4">
+            <button id="btn-test-sound" onclick="toggleAudio()" class="flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-white text-xs px-3 py-1.5 rounded-lg border border-neutral-700">🔔 Sound Enabled</button>
             <a href="kds.html" class="btn-primary text-sm hidden sm:flex items-center"><i data-lucide="monitor-play" class="h-4 w-4 mr-2"></i>Chef KDS Screen</a>
             <div class="flex items-center space-x-2 text-sm font-medium text-green-600">
               <span class="w-2 h-2 rounded-full bg-green-600 animate-pulse"></span>
@@ -162,6 +163,72 @@
       </div>
       <div class="flex-1 overflow-y-auto p-6" id="drawer-content"></div>
       <div class="p-6 border-t border-gray-200 bg-gray-50 shrink-0" id="drawer-actions"></div>
+    </div>
+
+    <!-- Incoming Order Modal -->
+    <div id="incoming-order-backdrop" class="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm hidden" onclick="closeIncomingOrderModal()">
+      <div id="incoming-order-modal" class="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-neutral-200 overflow-hidden text-neutral-900 animate-in fade-in zoom-in-95 duration-200 hidden flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+        
+        <!-- Modal Header -->
+        <div class="p-6 border-b border-neutral-100 flex items-center justify-between shrink-0">
+          <div>
+            <div class="flex items-center gap-3">
+              <h2 class="text-2xl font-black tracking-tight text-neutral-900" id="incoming-order-number">ORD-0000</h2>
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-neutral-100 text-neutral-800 border border-neutral-300" id="incoming-table">
+                Table 1
+              </span>
+            </div>
+            <p class="text-xs text-neutral-500 font-medium mt-1">Customer: <span class="text-neutral-800 font-semibold" id="incoming-customer">Guest</span></p>
+          </div>
+          <div class="px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-xs font-mono font-bold" id="incoming-timer">
+            ⏱ 00:00
+          </div>
+        </div>
+
+        <!-- Modal Body -->
+        <div class="p-6 max-h-[60vh] overflow-y-auto space-y-4 flex-1">
+          
+          <!-- Customer Note Box -->
+          <div id="incoming-note-container" class="bg-amber-50/80 border border-amber-300/80 rounded-2xl p-4 hidden">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-amber-800 flex items-center gap-1.5">
+              📝 Customer Note:
+            </span>
+            <p class="text-sm text-amber-950 font-semibold mt-1 leading-relaxed" id="incoming-note">
+              ""
+            </p>
+          </div>
+
+          <!-- Order Items Section -->
+          <div>
+            <div class="flex items-center justify-between mb-2.5">
+              <span class="text-xs font-bold tracking-wider text-neutral-400 uppercase">Order Items</span>
+              <span class="text-[11px] text-neutral-400">Uncheck to reject item</span>
+            </div>
+
+            <div class="space-y-2" id="incoming-items-list">
+              <!-- Render each item card -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Footer / Total & Actions -->
+        <div class="p-6 bg-neutral-50 border-t border-neutral-100 shrink-0">
+          <div class="flex items-center justify-between mb-5">
+            <span class="text-xs font-bold tracking-wider uppercase text-neutral-500">Payable Total</span>
+            <span id="incoming-total" class="text-2xl font-black text-neutral-900">₹0.00</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <button id="btn-reject-entire" class="w-full py-3.5 px-4 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 font-bold text-sm transition-all active:scale-[0.98]">
+              Reject Order
+            </button>
+            <button id="btn-accept-selective" class="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md transition-all active:scale-[0.98]">
+              Accept Order
+            </button>
+          </div>
+        </div>
+
+      </div>
     </div>
 
     <script>
