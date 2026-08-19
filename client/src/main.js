@@ -239,26 +239,33 @@ async function fetchAllOrders() {
     const data = await res.json();
     if (res.ok) {
       allOrdersData = data;
-      
-      syncKitchenBellState(data);
-      
-      const liveOrdersBody = document.getElementById('live-orders-body');
-      if (liveOrdersBody) {
-        const liveOrders = data.filter(o => !['COMPLETED', 'REJECTED'].includes(o.status));
-        renderDashboardLiveOrders(liveOrders, liveOrdersBody);
-      }
-      
-      const kdsGrid = document.getElementById('kds-ticket-grid');
-      if (kdsGrid) {
-        renderKdsTickets(data, kdsGrid);
-        updateKdsCounters(data);
-      }
-      
-      if (document.getElementById('master-orders-body')) {
-        filterAndRenderOrders();
-        updateOrdersCounts();
-      }
+      updateAllUI();
     }
+  } catch (err) {
+    console.error('Failed to fetch orders:', err);
+  }
+}
+
+window.updateAllUI = function() {
+  syncKitchenBellState(allOrdersData);
+  
+  const liveOrdersBody = document.getElementById('live-orders-body');
+  if (liveOrdersBody) {
+    const liveOrders = allOrdersData.filter(o => !['COMPLETED', 'REJECTED'].includes(o.status));
+    renderDashboardLiveOrders(liveOrders, liveOrdersBody);
+  }
+  
+  const kdsGrid = document.getElementById('kds-ticket-grid');
+  if (kdsGrid) {
+    renderKdsTickets(allOrdersData, kdsGrid);
+    updateKdsCounters(allOrdersData);
+  }
+  
+  if (document.getElementById('master-orders-body')) {
+    filterAndRenderOrders();
+    updateOrdersCounts();
+  }
+};
   } catch (err) {
     console.error('Failed to fetch orders:', err);
   }
@@ -902,15 +909,29 @@ function setupSocketListeners() {
     if (newOrder && newOrder._id && !seenOrderIds.has(newOrder._id)) {
       seenOrderIds.add(newOrder._id);
       if (audioEnabled) playKitchenBell();
+      
+      allOrdersData.unshift(newOrder);
+      syncKitchenBellState(allOrdersData);
+      
+      updateAllUI();
     }
-    
-    fetchAllOrders(); // Reload everything (realtime)
   });
-  socket.on('order:status_changed', () => {
+  
+  socket.on('order:status_changed', (updatedOrder) => {
     const isDashboard = document.getElementById('kpi-revenue');
     if (isDashboard) fetchStats();
     
-    fetchAllOrders();
+    if (updatedOrder && updatedOrder._id) {
+      const idx = allOrdersData.findIndex(o => o._id === updatedOrder._id);
+      if (idx !== -1) {
+        allOrdersData[idx] = updatedOrder;
+      } else {
+        allOrdersData.unshift(updatedOrder);
+      }
+      syncKitchenBellState(allOrdersData);
+      
+      updateAllUI();
+    }
   });
 }
 

@@ -387,13 +387,20 @@ window.toggleStock = async (id, isAvailable) => {
       body: JSON.stringify({ isAvailable })
     });
     if (res.ok) {
-      // Update local data and re-render without full fetch for speed
       const item = menuItemsData.find(i => i._id === id);
       if (item) item.isAvailable = isAvailable;
       filterMenuItems();
+      if (typeof showToast === 'function') {
+        showToast(`Stock status updated to ${isAvailable ? 'In Stock' : 'Out of Stock'}`, 'success');
+      }
+    } else {
+      throw new Error('Failed to update stock');
     }
   } catch (err) {
     console.error(err);
+    if (typeof showToast === 'function') {
+      showToast('Failed to update stock status', 'error');
+    }
   }
 };
 
