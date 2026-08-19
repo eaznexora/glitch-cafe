@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Analytics & Reports - Glitch Cafe Admin</title>
     <script src="./src/config.js"></script>
+  <script src="./src/toast.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -99,7 +100,7 @@
             <h2 class="text-xl font-bold text-monochrome-900">Analytics & Performance Reports</h2>
           </div>
           <div class="flex items-center">
-            <button class="btn-primary flex items-center" onclick="alert('Exporting PDF...')">
+            <button class="btn-primary flex items-center" onclick="showToast('Exporting PDF...', 'error')">
               <i data-lucide="download" class="h-4 w-4 mr-2"></i> Export Report
             </button>
           </div>

@@ -223,7 +223,7 @@ window.saveCategory = async () => {
   const name = document.getElementById('category-name').value;
   const order = document.getElementById('category-order').value;
   
-  if (!name) return alert('Category Name is required.');
+  if (!name) return showToast('Category Name is required.', 'error');
   if (!slug) slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
 
   const payload = { name, slug, displayOrder: parseInt(order) || 0 };
@@ -243,7 +243,7 @@ window.saveCategory = async () => {
       await fetchCategories();
     } else {
       const err = await res.json();
-      alert(`Error: ${err.error}`);
+      showToast(`Error: ${err.error}`, 'error');
     }
   } catch (err) {
     console.error(err);
@@ -334,7 +334,7 @@ window.saveMenuItem = async () => {
   const isSpecial = document.getElementById('item-isspecial')?.checked ?? false;
   const displayOrder = Number(document.getElementById('item-order').value) || 1;
   
-  if (!name || !categoryId || !price) return alert('Name, Category, and Price are required.');
+  if (!name || !categoryId || !price) return showToast('Name, Category, and Price are required.', 'error');
 
   // Find categorySlug from selected category
   const selectedCat = categoriesData.find(c => c._id === categoryId);
@@ -365,17 +365,17 @@ window.saveMenuItem = async () => {
     if (res.ok) {
       const doc = await res.json();
       console.log('Saved Document:', doc);
-      alert('Product saved successfully!');
+      showToast('Product saved successfully!', 'success');
       closeMenuItemModal();
       await fetchMenuItems(); // Refresh grid
       renderCategoryList(); // Update counts in sidebar
     } else {
       const err = await res.json();
-      alert(`Error: ${err.error || 'Server error'}`);
+      showToast(`Error: ${err.error || 'Server error'}`, 'error');
     }
   } catch (err) {
     console.error(err);
-    alert('Failed to connect to backend API.');
+    showToast('Failed to connect to backend API.', 'error');
   }
 };
 
@@ -432,7 +432,7 @@ document.getElementById('confirm-delete-btn').addEventListener('click', async ()
         renderCategoryList(); // Update counts
       }
     } else {
-      alert('Failed to delete.');
+      showToast('Failed to delete.', 'error');
     }
   } catch (err) {
     console.error(err);

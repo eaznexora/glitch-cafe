@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Settings & Access - Glitch Cafe Admin</title>
     <script src="./src/config.js"></script>
+  <script src="./src/toast.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -106,7 +107,7 @@
           </div>
           <!-- auth.js injects Role Switcher here -->
           <div class="flex items-center">
-            <button class="btn-primary" onclick="alert('Save all configurations?');">Save Changes</button>
+            <button class="btn-primary" onclick="showToast('Save all configurations?', 'error');">Save Changes</button>
           </div>
         </div>
         <div class="px-4 lg:px-8 flex overflow-x-auto no-scrollbar">
@@ -178,7 +179,7 @@
               </div>
             </div>
             <div class="pt-4 border-t border-gray-100 flex justify-end">
-              <button class="btn-primary" onclick="alert('Profile Saved!')">Save Profile Details</button>
+              <button class="btn-primary" onclick="showToast('Profile Saved!', 'error')">Save Profile Details</button>
             </div>
           </div>
         </div>

@@ -12,7 +12,7 @@ let editingStaffId = null;
 
 async function fetchStaffList() {
   try {
-    const res = await fetch('${window.API_BASE}/auth/staff', {
+    const res = await fetch(`${window.API_BASE}/auth/staff`, {
       headers: getAuthHeaders()
     });
     if (res.ok) {
@@ -113,11 +113,11 @@ window.saveStaffMember = async () => {
   const permissions = Array.from(checkboxes).map(cb => cb.value);
   
   if (!email) {
-    alert("Please fill the email address.");
+    showToast("Please fill the email address.", 'error');
     return;
   }
   if (!editingStaffId && !password) {
-    alert("Please fill the password for new staff.");
+    showToast("Please fill the password for new staff.", 'error');
     return;
   }
 
@@ -132,15 +132,15 @@ window.saveStaffMember = async () => {
     });
     
     if (res.ok) {
-      alert(`Staff member ${editingStaffId ? 'updated' : 'created'} successfully!`);
+      showToast(`Staff member ${editingStaffId ? 'updated' : 'created'} successfully!`, 'success');
       closeStaffModal();
       fetchStaffList();
     } else {
       const err = await res.json();
-      alert(`Error: ${err.error}`);
+      showToast(`Error: ${err.error}`, 'error');
     }
   } catch (err) {
-    alert('Failed to save staff member');
+    showToast('Failed to save staff member', 'error');
     console.error(err);
   }
 };

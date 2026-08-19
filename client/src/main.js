@@ -485,7 +485,7 @@ window.openOrderDrawer = (orderId) => {
   `;
 
   let actionsHtml = `
-    <button class="w-full bg-monochrome-900 text-white font-bold py-3 rounded hover:bg-monochrome-800 transition-colors flex items-center justify-center" onclick="alert('Printing KOT / Receipt...')">
+    <button class="w-full bg-monochrome-900 text-white font-bold py-3 rounded hover:bg-monochrome-800 transition-colors flex items-center justify-center" onclick="showToast('Printing KOT / Receipt...', 'error')">
       <i data-lucide="printer" class="h-4 w-4 mr-2"></i> Print Receipt
     </button>
     ${!isPaid && order.status !== 'REJECTED' ? `<button class="w-full mt-3 bg-white border border-gray-300 text-monochrome-900 font-bold py-3 rounded hover:bg-gray-50 transition-colors" onclick="updateOrderStatus('${order._id}', null, 'PAID')">Mark as Paid</button>` : ''}
@@ -507,21 +507,20 @@ window.openOrderDrawer = (orderId) => {
   actions.innerHTML = actionsHtml;
 
   if (typeof lucide !== 'undefined') lucide.createIcons();
-  
   drawer.classList.remove('translate-x-full');
   backdrop.classList.remove('hidden');
 };
 
-window.removeOrderItem = (orderId, itemIndex) => {
+window.removeOrderItem = async (orderId, itemIndex) => {
   const order = allOrdersData.find(o => o._id === orderId);
   if (!order) return;
   
   if (order.items.length <= 1) {
-    alert("Cannot remove the only item. Reject the order instead.");
+    showToast("Cannot remove the only item. Reject the order instead.", 'error');
     return;
   }
   
-  if (!confirm("Are you sure you want to remove this item? It will be marked as out of stock for this order.")) return;
+  if (!(await showConfirm("Are you sure you want to remove this item? It will be marked as out of stock for this order."))) return;
   
   // Mutate local state and recalculate
   order.items.splice(itemIndex, 1);
@@ -670,7 +669,7 @@ window.rejectEntireIncomingOrder = async (orderId) => {
   const order = allOrdersData.find(o => o._id === orderId);
   if (!order) return;
   
-  if (!confirm('Are you sure you want to reject this entire order?')) return;
+  if (!(await showConfirm('Are you sure you want to reject this entire order?'))) return;
   
   try {
     await fetch(`${API_BASE}/orders/${orderId}/status`, {

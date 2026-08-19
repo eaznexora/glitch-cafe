@@ -292,7 +292,7 @@ window.settleBill = async () => {
       // Re-open drawer to show Paid state
       openDrawer(currentBill._id);
     } else {
-      alert('Failed to settle bill.');
+      showToast('Failed to settle bill.', 'error');
     }
   } catch (err) {
     console.error(err);

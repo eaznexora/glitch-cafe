@@ -345,7 +345,7 @@ window.openCustomizationModal = function(itemId) {
   const modal = document.getElementById('customization-modal');
 
   if (!backdrop || !modal) {
-    alert("CRITICAL ERROR: Elements #customization-backdrop or #customization-modal not found in HTML!");
+    showToast("CRITICAL ERROR: Elements #customization-backdrop or #customization-modal not found in HTML!", 'error');
     return;
   }
 
@@ -779,7 +779,7 @@ async function handleAuthRequestOTP() {
   const email = document.getElementById('auth-email').value.trim();
   
   if (!name || !email) {
-    alert('Please enter both Name and Email');
+    showToast('Please enter both Name and Email', 'error');
     return;
   }
 
@@ -803,10 +803,10 @@ async function handleAuthRequestOTP() {
       document.getElementById('auth-display-email').innerText = email;
       startResendTimer();
     } else {
-      alert(data.error || 'Failed to send OTP');
+      showToast(data.error || 'Failed to send OTP', 'error');
     }
   } catch (err) {
-    alert('Error connecting to server');
+    showToast('Error connecting to server', 'error');
   } finally {
     btn.innerText = originalText;
     btn.disabled = false;
@@ -818,7 +818,7 @@ async function handleAuthVerify() {
   const otp = document.getElementById('auth-otp').value.trim();
   
   if (!otp || otp.length !== 6) {
-    alert('Please enter a valid 6-digit code');
+    showToast('Please enter a valid 6-digit code', 'error');
     return;
   }
 
@@ -847,12 +847,12 @@ async function handleAuthVerify() {
       dismissAuthModal();
       
       // Optional: show a small toast "Welcome, [Name]!"
-      setTimeout(() => alert(`Welcome, ${data.customer.name}!`), 350);
+      setTimeout(() => showToast(`Welcome, ${data.customer.name}!`, 'success'), 350);
     } else {
-      alert(data.error || 'Invalid OTP');
+      showToast(data.error || 'Invalid OTP', 'error');
     }
   } catch (err) {
-    alert('Error connecting to server');
+    showToast('Error connecting to server', 'error');
   } finally {
     btn.innerText = 'Verify & Continue';
     btn.disabled = false;

@@ -51,7 +51,7 @@ function initAutoResizeNote() {
 
 async function fetchProducts() {
   try {
-    const res = await fetch('${window.API_BASE}/products');
+    const res = await fetch(`${window.API_BASE}/products`);
     if (res.ok) {
       masterProducts = await res.json();
     }
@@ -262,7 +262,7 @@ async function submitOrderPayload(customer) {
   };
 
   try {
-    const res = await fetch('${window.API_BASE}/orders', {
+    const res = await fetch(`${window.API_BASE}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -293,12 +293,12 @@ async function submitOrderPayload(customer) {
       startOrderPolling(createdOrder._id);
     } else {
       const err = await res.json();
-      alert(`Error placing order: ${err.error || 'Unknown error'}`);
+      showToast(`Error placing order: ${err.error || 'Unknown error'}`, 'error');
       btn.innerText = 'Place Order';
       btn.disabled = false;
     }
   } catch (err) {
-    alert('Network error, please try again later.');
+    showToast('Network error, please try again later.', 'error');
     btn.innerText = 'Place Order';
     btn.disabled = false;
   }
@@ -332,7 +332,7 @@ function startOrderPolling(orderId) {
           btn.className = 'w-full bg-red-600 text-white font-semibold py-4 px-6 rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed';
           btn.innerHTML = `<span>Order Declined ✕</span>`;
           
-          alert('Your order could not be accepted by the kitchen.');
+          showToast('Your order could not be accepted by the kitchen.', 'error');
         }
       }
     } catch (err) {
@@ -399,7 +399,7 @@ async function handleAuthRequestOTP() {
   const email = document.getElementById('auth-email').value.trim();
   
   if (!name || !email) {
-    alert('Please enter both Name and Email');
+    showToast('Please enter both Name and Email', 'error');
     return;
   }
 
@@ -423,10 +423,10 @@ async function handleAuthRequestOTP() {
       document.getElementById('auth-display-email').innerText = email;
       startResendTimer();
     } else {
-      alert(data.error || 'Failed to send OTP');
+      showToast(data.error || 'Failed to send OTP', 'error');
     }
   } catch (err) {
-    alert('Error connecting to server');
+    showToast('Error connecting to server', 'error');
   } finally {
     btn.innerText = originalText;
     btn.disabled = false;
@@ -438,7 +438,7 @@ async function handleAuthVerify() {
   const otp = document.getElementById('auth-otp').value.trim();
   
   if (!otp || otp.length !== 6) {
-    alert('Please enter a valid 6-digit code');
+    showToast('Please enter a valid 6-digit code', 'error');
     return;
   }
 
@@ -467,17 +467,17 @@ async function handleAuthVerify() {
       
       dismissAuthModal();
       
-      setTimeout(() => alert(`Welcome, ${data.customer.name}!`), 350);
+      setTimeout(() => showToast(`Welcome, ${data.customer.name}!`, 'success'), 350);
       
       if (window.pendingOrderSubmission) {
         window.pendingOrderSubmission = false;
         submitOrderPayload(customer);
       }
     } else {
-      alert(data.error || 'Invalid OTP');
+      showToast(data.error || 'Invalid OTP', 'error');
     }
   } catch (err) {
-    alert('Error connecting to server');
+    showToast('Error connecting to server', 'error');
   } finally {
     btn.innerText = 'Verify & Continue';
     btn.disabled = false;

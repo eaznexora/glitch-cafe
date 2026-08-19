@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Login - Glitch Cafe</title>
   <script src="./src/config.js"></script>
+  <script src="./src/toast.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -124,20 +125,12 @@
                 errAlert.classList.remove('hidden', 'bg-red-50', 'text-red-600', 'border-red-200');
                 errAlert.classList.add('bg-green-50', 'text-green-600', 'border-green-200');
                 
-                // Hide after 3 seconds
-                setTimeout(() => {
-                  errAlert.classList.add('hidden');
-                  // Restore error styling for future errors
-                  errAlert.classList.remove('bg-green-50', 'text-green-600', 'border-green-200');
-                  errAlert.classList.add('bg-red-50', 'text-red-600', 'border-red-200');
-                }, 3000);
-
-                startResendTimer();
+                showToast('OTP Resent!', 'success');
               } else {
-                alert(data.error || 'Failed to resend OTP');
+                showToast(data.error || 'Failed to resend OTP', 'error');
               }
             } catch (err) {
-              alert('Network error, please try again later.');
+              showToast('Network error, please try again later.', 'error');
             }
           };
         } else {
