@@ -276,7 +276,7 @@ function renderDashboardLiveOrders(orders, container) {
     return;
   }
   orders.forEach(order => {
-    const tableNumber = order.tableId ? order.tableId.tableNumber : 'N/A';
+    const tableNumber = order.tableNumber || order.table || 'Takeaway';
     const itemsCount = order.items.reduce((acc, item) => acc + item.quantity, 0);
     let statusClass = 'bg-gray-100 text-gray-800';
     if (order.status === 'PENDING') statusClass = 'bg-gray-200 text-monochrome-900 font-bold';
@@ -338,7 +338,7 @@ function filterAndRenderOrders() {
     
     let matchesSearch = true;
     if (searchQ) {
-      const tableStr = `table ${order.tableId ? order.tableId.tableNumber : ''}`.toLowerCase();
+      const tableStr = `table ${order.tableNumber || order.table || ''}`.toLowerCase();
       const orderNo = order.orderNumber.toLowerCase();
       const itemsStr = order.items.map(i => i.name.toLowerCase()).join(' ');
       matchesSearch = tableStr.includes(searchQ) || orderNo.includes(searchQ) || itemsStr.includes(searchQ);
@@ -361,7 +361,7 @@ function renderMasterOrders(orders) {
   }
 
   orders.forEach(order => {
-    const tableNumber = order.tableId ? order.tableId.tableNumber : 'N/A';
+    const tableNumber = order.tableNumber || order.table || 'Takeaway';
     const timestamp = new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
     const isPaid = order.paymentStatus === 'PAID';
@@ -452,7 +452,7 @@ window.openOrderDrawer = (orderId) => {
   const content = document.getElementById('drawer-content');
   const actions = document.getElementById('drawer-actions');
 
-  const tableNumber = order.tableId ? order.tableId.tableNumber : order.table || 'Walk-in';
+  const tableNumber = order.tableNumber || order.table || 'Takeaway';
   const timestamp = new Date(order.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
   const isPaid = order.paymentStatus === 'PAID';
 
@@ -558,6 +558,9 @@ window.acceptOrder = async (orderId) => {
   if (!order) return;
   
   try {
+    order.status = 'PREPARING';
+    updateAllUI();
+
     await fetch(`${API_BASE}/orders/${orderId}/accept`, {
       method: 'PATCH',
       headers: getAuthHeaders(),
@@ -592,7 +595,7 @@ window.openIncomingOrderModal = (orderId) => {
   
   // Populate Headers
   document.getElementById('incoming-order-number').innerText = order.orderNumber;
-  document.getElementById('incoming-table').innerText = order.tableId ? order.tableId.tableNumber : order.table || 'Walk-in';
+  document.getElementById('incoming-table').innerText = order.tableNumber || order.table || 'Takeaway';
   document.getElementById('incoming-customer').innerText = order.customerName || 'Guest';
   
   // Note
@@ -693,6 +696,9 @@ window.rejectEntireIncomingOrder = async (orderId) => {
   if (!(await showConfirm('Are you sure you want to reject this entire order?'))) return;
   
   try {
+    order.status = 'REJECTED';
+    updateAllUI();
+
     await fetch(`${API_BASE}/orders/${orderId}/status`, {
       method: 'PATCH',
       headers: getAuthHeaders(),
@@ -737,6 +743,9 @@ window.acceptSelectiveIncomingOrder = async (orderId) => {
   const newTotal = newSubtotal + newTax;
   
   try {
+    order.status = acceptedItemIndices.length > 0 ? 'PREPARING' : 'CANCELLED';
+    updateAllUI();
+
     await fetch(`${API_BASE}/orders/${orderId}/accept-selective`, {
       method: 'PATCH',
       headers: getAuthHeaders(),
@@ -789,7 +798,7 @@ function renderKdsTickets(orders, container) {
   }
 
   kdsOrders.forEach(order => {
-    const tableNumber = order.tableId ? order.tableId.tableNumber : 'N/A';
+    const tableNumber = order.tableNumber || order.table || 'Takeaway';
     const timestamp = new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
     let borderColor = 'border-gray-200';
@@ -885,6 +894,13 @@ window.updateOrderStatus = async (id, newStatus, newPaymentStatus = null) => {
     const payload = {};
     if (newStatus) payload.status = newStatus;
     if (newPaymentStatus) payload.paymentStatus = newPaymentStatus;
+    
+    const order = allOrdersData.find(o => o._id === id);
+    if (order) {
+      if (newStatus) order.status = newStatus;
+      if (newPaymentStatus) order.paymentStatus = newPaymentStatus;
+      updateAllUI();
+    }
     
     await fetch(`${API_BASE}/orders/${id}/status`, {
       method: 'PATCH',

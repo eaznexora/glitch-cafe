@@ -10,9 +10,11 @@ window.getTableNumber = function() {
   if (token) {
     try {
       const decoded = JSON.parse(atob(token));
-      if (decoded.table) {
-        sessionStorage.setItem('glitch_table_id', decoded.table);
-        return decoded.table;
+      if (decoded.table || decoded.tableNumber) {
+        const t = decoded.table || decoded.tableNumber;
+        sessionStorage.setItem('glitch_table_id', t);
+        sessionStorage.setItem('glitch_table', `Table ${t}`);
+        return t;
       }
     } catch (err) {
       console.warn("Invalid table token", err);
@@ -22,6 +24,7 @@ window.getTableNumber = function() {
   const legacyTable = params.get('table');
   if (legacyTable) {
     sessionStorage.setItem('glitch_table_id', legacyTable);
+    sessionStorage.setItem('glitch_table', `Table ${legacyTable}`);
     return legacyTable;
   }
   
