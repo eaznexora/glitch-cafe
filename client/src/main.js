@@ -5,7 +5,7 @@ const socket = io(window.location.origin, { path: window.isSubpath ? '/THE-GLITC
 // Global state
 let salesChartInstance = null;
 let allOrdersData = [];
-let audioEnabled = false;
+let audioEnabled = localStorage.getItem('glitch_sound_enabled') === 'true';
 let orderToReject = null;
 let currentOrdersFilter = 'all';
 let seenOrderIds = new Set();
@@ -74,30 +74,43 @@ window.toggleSidebar = () => {
 
 window.toggleAudio = () => {
   audioEnabled = !audioEnabled;
-  const icon = document.getElementById('audio-icon');
-  
+  localStorage.setItem('glitch_sound_enabled', audioEnabled);
+  updateAudioUI();
+
   if (audioEnabled) {
-    // Initialize AudioContext on user interaction
     if (!audioCtx) {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
     if (audioCtx.state === 'suspended') {
       audioCtx.resume();
     }
-    
-    if (icon) {
-      icon.setAttribute('data-lucide', 'volume-2');
-      lucide.createIcons();
-    }
-    
-    playKitchenBell(); // Test chime
+    playKitchenBell();
   } else {
-    if (icon) {
-      icon.setAttribute('data-lucide', 'volume-x');
-      lucide.createIcons();
+    // If muted, clear any ongoing loop
+    if (bellInterval) {
+      clearInterval(bellInterval);
+      bellInterval = null;
     }
   }
 };
+
+function updateAudioUI() {
+  const btn = document.getElementById('btn-audio-toggle');
+  if (btn) {
+    if (audioEnabled) {
+      btn.className = "flex items-center gap-2 bg-green-100 hover:bg-green-200 text-green-700 text-xs px-3 py-1.5 rounded-lg border border-green-300 font-bold transition-colors";
+      btn.innerHTML = "🔔 Alert Active";
+    } else {
+      btn.className = "flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs px-3 py-1.5 rounded-lg border border-slate-300 font-bold transition-colors";
+      btn.innerHTML = "🔕 Muted (Away)";
+    }
+  }
+}
+
+// Call once on load to set initial UI
+document.addEventListener('DOMContentLoaded', () => {
+  updateAudioUI();
+});
 
 function playKitchenBell() {
   try {
@@ -533,6 +546,11 @@ window.removeOrderItem = async (orderId, itemIndex) => {
 };
 
 window.acceptOrder = async (orderId) => {
+  if (bellInterval) {
+    clearInterval(bellInterval);
+    bellInterval = null;
+  }
+  
   const order = allOrdersData.find(o => o._id === orderId);
   if (!order) return;
   
@@ -684,6 +702,11 @@ window.rejectEntireIncomingOrder = async (orderId) => {
 };
 
 window.acceptSelectiveIncomingOrder = async (orderId) => {
+  if (bellInterval) {
+    clearInterval(bellInterval);
+    bellInterval = null;
+  }
+  
   const order = allOrdersData.find(o => o._id === orderId);
   if (!order) return;
   

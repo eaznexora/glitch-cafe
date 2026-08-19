@@ -19,7 +19,9 @@ function renderTables() {
     card.className = 'bg-monochrome-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col items-center justify-between transition-shadow hover:shadow-md';
     
     // URL encoded for the QR
-    const qrUrl = `${window.location.origin}${window.BASE_PATH}/customer.html?table=${table.id}`;
+    const tokenObj = { table: table.id, salt: Date.now() };
+    const tokenStr = btoa(JSON.stringify(tokenObj));
+    const qrUrl = `${window.location.origin}${window.BASE_PATH}/customer.html?token=${tokenStr}`;
 
     card.innerHTML = `
       <div class="w-full flex justify-between items-start mb-4">

@@ -61,8 +61,8 @@ async function fetchProducts() {
 }
 
 function initURLParams() {
-  const params = new URLSearchParams(window.location.search);
-  const table = params.get('table');
+  // Extract table from URL or token
+  const table = window.getTableNumber();
   if (table) {
     tableNumber = table;
   }

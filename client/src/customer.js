@@ -46,8 +46,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initURLParams() {
-  const params = new URLSearchParams(window.location.search);
-  const table = params.get('table');
+  // Extract table from URL
+  const table = window.getTableNumber();
   if (table) {
     currentTable = table;
   }
