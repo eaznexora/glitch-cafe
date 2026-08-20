@@ -26,42 +26,34 @@ let bellInterval = null;
 
 function syncKitchenBellState(orders) {
   const hasPending = orders.some(o => (o.status || '').toUpperCase() === 'PENDING');
-  
   if (hasPending) {
-    if (!bellInterval) {
-      if (audioEnabled) playKitchenBell(); // Immediate first chime
-      bellInterval = setInterval(() => {
-        if (audioEnabled) playKitchenBell();
-      }, 1500); // Rings every 1.5 seconds
-    }
+    playKitchenChime();
   } else {
-    if (bellInterval) {
-      clearInterval(bellInterval);
-      bellInterval = null;
-    }
+    stopKitchenChime();
   }
 }
 
+// 1. Global Audio instance
 let audioUnlocked = false;
-let audioCtx = null;
+const bellAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+bellAudio.loop = true;
 
-function unlockAudio() {
+// 2. Immediate unlock on ANY user interaction
+function enableAudioPlayback() {
   if (audioUnlocked) return;
-  
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  if (audioCtx.state === 'suspended') {
-    audioCtx.resume();
-  }
-  
-  audioUnlocked = true;
-  console.log('🔊 Kitchen Audio Context unlocked successfully');
+  bellAudio.play().then(() => {
+    bellAudio.pause();
+    bellAudio.currentTime = 0;
+    audioUnlocked = true;
+    console.log('🔊 Kitchen Audio fully enabled and unlocked!');
+  }).catch(err => {
+    console.warn('Audio unlock pending user gesture:', err);
+  });
 }
 
-document.addEventListener('click', unlockAudio, { once: true });
-document.addEventListener('touchstart', unlockAudio, { once: true });
-document.addEventListener('keydown', unlockAudio, { once: true });
+window.addEventListener('click', enableAudioPlayback, { once: true });
+window.addEventListener('touchstart', enableAudioPlayback, { once: true });
+window.addEventListener('keydown', enableAudioPlayback, { once: true });
 async function init() {
   const isDashboard = document.getElementById('kpi-revenue');
   if (isDashboard) {
@@ -100,15 +92,10 @@ window.toggleAudio = () => {
   updateAudioUI();
 
   if (audioEnabled) {
-    unlockAudio();
-    playKitchenBell();
+    enableAudioPlayback();
     syncKitchenBellState(allOrdersData);
   } else {
-    // If muted, clear any ongoing loop
-    if (bellInterval) {
-      clearInterval(bellInterval);
-      bellInterval = null;
-    }
+    stopKitchenChime();
   }
 };
 
@@ -130,43 +117,19 @@ document.addEventListener('DOMContentLoaded', () => {
   updateAudioUI();
 });
 
-function playKitchenBell() {
-  if (localStorage.getItem('glitch_sound_enabled') === 'false') return;
-  if (!audioUnlocked || !audioCtx) return;
-  try {
-    const ctx = audioCtx;
-    if (ctx.state === 'suspended') {
-      ctx.resume();
-    }
+// 3. Dedicated chime function
+function playKitchenChime() {
+  const isMuted = localStorage.getItem('glitch_sound_enabled') === 'false';
+  if (isMuted) return;
 
-    const now = ctx.currentTime;
-    
-    // High Ding (1046.50 Hz - C6)
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.type = 'triangle';
-    osc1.frequency.setValueAtTime(1046.50, now);
-    gain1.gain.setValueAtTime(1, now);
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-    osc1.start(now);
-    osc1.stop(now + 0.8);
-
-    // Resonant Ding (1318.51 Hz - E6)
-    const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(1318.51, now + 0.15);
-    gain2.gain.setValueAtTime(1, now + 0.15);
-    gain2.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
-    osc2.start(now + 0.15);
-    osc2.stop(now + 1.2);
-  } catch (e) {
-    console.warn('Audio play error:', e);
+  if (audioUnlocked) {
+    bellAudio.play().catch(e => console.warn('Playback error:', e));
   }
+}
+
+function stopKitchenChime() {
+  bellAudio.pause();
+  bellAudio.currentTime = 0;
 }
 
 function calculateElapsedMinutes(createdAt) {
@@ -568,10 +531,7 @@ window.removeOrderItem = async (orderId, itemIndex) => {
 };
 
 window.acceptOrder = async (orderId) => {
-  if (bellInterval) {
-    clearInterval(bellInterval);
-    bellInterval = null;
-  }
+  stopKitchenChime();
   
   const order = allOrdersData.find(o => o._id === orderId);
   if (!order) return;
@@ -709,6 +669,7 @@ window.recalculateIncomingTotal = (orderId) => {
 };
 
 window.rejectEntireIncomingOrder = async (orderId) => {
+  stopKitchenChime();
   const order = allOrdersData.find(o => o._id === orderId);
   if (!order) return;
   
@@ -893,6 +854,7 @@ window.closeRejectionModal = () => {
 };
 
 window.submitRejection = async (reason) => {
+  stopKitchenChime();
   if (!orderToReject) return;
   try {
     await fetch(`${API_BASE}/orders/${orderToReject}/status`, {
@@ -936,26 +898,31 @@ const processedOrderIds = new Set();
 
 function setupSocketListeners() {
   const handleIncomingOrder = async (newOrder) => {
+    if (!newOrder) return;
     const orderId = newOrder._id || newOrder.id || newOrder.orderNumber;
-    if (!orderId || processedOrderIds.has(orderId)) return;
     
+    // 1. Strict deduplication check
+    if (processedOrderIds.has(orderId)) return;
     processedOrderIds.add(orderId);
-    console.log('⚡ Processing unique incoming order:', orderId);
 
-    // 1. Show single toast
-    if (typeof showToast === 'function') {
-      showToast(`🔔 New Order from Table ${newOrder.tableNumber || newOrder.table || '1'}!`, 'info');
-    }
+    console.log('⚡ Inserting & Rendering new incoming order:', orderId);
 
-    // 2. Play chime
-    if (typeof playKitchenBell === 'function') {
-      playKitchenBell();
-    }
-
-    // 3. Immediately re-fetch and render all orders cleanly
+    // 2. Fetch latest orders immediately from API to guarantee exact schema alignment and sorting
     if (typeof fetchAllOrders === 'function') {
       await fetchAllOrders();
-      syncKitchenBellState(allOrdersData);
+    }
+
+    // 3. Force re-render
+    if (typeof updateAllUI === 'function') {
+      updateAllUI();
+    }
+
+    // 4. Play chime
+    playKitchenChime();
+
+    // 5. Toast
+    if (typeof showToast === 'function') {
+      showToast(`🔔 New Order from Table ${newOrder.tableNumber || newOrder.table || '1'}!`, 'info');
     }
   };
 
