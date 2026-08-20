@@ -1,7 +1,7 @@
 // Configuration for the Glitch Cafe frontend
 const isSubpath = window.location.pathname.startsWith('/THE-GLITCH-CAFE');
 window.BASE_PATH = isSubpath ? '/THE-GLITCH-CAFE' : '';
-window.API_BASE = isSubpath ? '/THE-GLITCH-CAFE/api' : (window.location.origin.includes('5500') || window.location.origin.includes('localhost') ? 'http://localhost:5005/api' : '/api');
+window.API_BASE = isSubpath ? '/THE-GLITCH-CAFE/api' : '/api';
 
 window.getTableNumber = function() {
   const params = new URLSearchParams(window.location.search);

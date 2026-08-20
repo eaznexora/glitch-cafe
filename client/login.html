@@ -138,7 +138,8 @@
             if (timerEl.classList.contains('text-gray-400')) return; // Cooldown active
 
             try {
-              const res = await fetch('http://localhost:5000/api/auth/resend-otp', {
+              const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
+              const res = await fetch(`${apiBase}/auth/resend-otp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: authEmail })
@@ -180,7 +181,8 @@
       try {
         if (currentStep === 1) {
           // STEP 1: Validate Credentials & Send OTP
-          const res = await fetch('http://localhost:5000/api/auth/login', {
+          const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
+          const res = await fetch(`${apiBase}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
@@ -201,7 +203,8 @@
           }
         } else if (currentStep === 2) {
           // STEP 2: Verify OTP
-          const res = await fetch('http://localhost:5000/api/auth/verify-otp', {
+          const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
+          const res = await fetch(`${apiBase}/auth/verify-otp`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: authEmail, otp })
