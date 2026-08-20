@@ -1,7 +1,20 @@
 // customer.js
 // Logic for the mobile QR ordering web app
 
-const socket = io(window.location.origin, { path: window.isSubpath ? '/THE-GLITCH-CAFE/socket.io' : '/socket.io' }); // Connect to Socket.io
+const socket = io(window.location.origin, {
+  path: '/THE-GLITCH-CAFE/socket.io',
+  transports: ['websocket', 'polling']
+});
+
+window.socket = socket;
+
+socket.on('connect', () => {
+  console.log('🟢 REALTIME SOCKET CONNECTED! ID:', socket.id);
+});
+
+socket.on('connect_error', (err) => {
+  console.error('❌ Socket connection error:', err);
+});
 
 let menuItems = [];
 let categories = [];
