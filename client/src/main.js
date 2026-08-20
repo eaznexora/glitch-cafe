@@ -42,18 +42,26 @@ function syncKitchenBellState(orders) {
   }
 }
 
+let audioUnlocked = false;
 let audioCtx = null;
 
-function initAudio() {
+function unlockAudio() {
+  if (audioUnlocked) return;
+  
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
   if (audioCtx.state === 'suspended') {
     audioCtx.resume();
   }
+  
+  audioUnlocked = true;
+  console.log('🔊 Kitchen Audio Context unlocked successfully');
 }
-window.addEventListener('click', initAudio, { once: true });
-window.addEventListener('keydown', initAudio, { once: true });
+
+document.addEventListener('click', unlockAudio, { once: true });
+document.addEventListener('touchstart', unlockAudio, { once: true });
+document.addEventListener('keydown', unlockAudio, { once: true });
 async function init() {
   const isDashboard = document.getElementById('kpi-revenue');
   if (isDashboard) {
@@ -62,6 +70,7 @@ async function init() {
   }
   
   await fetchAllOrders();
+  syncKitchenBellState(allOrdersData);
   setupSocketListeners();
   
   // Start Timers if KDS is present
@@ -91,13 +100,9 @@ window.toggleAudio = () => {
   updateAudioUI();
 
   if (audioEnabled) {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
-    }
+    unlockAudio();
     playKitchenBell();
+    syncKitchenBellState(allOrdersData);
   } else {
     // If muted, clear any ongoing loop
     if (bellInterval) {
@@ -126,9 +131,10 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function playKitchenBell() {
+  if (localStorage.getItem('glitch_sound_enabled') === 'false') return;
+  if (!audioUnlocked || !audioCtx) return;
   try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    const ctx = new AudioContext();
+    const ctx = audioCtx;
     if (ctx.state === 'suspended') {
       ctx.resume();
     }
@@ -926,33 +932,30 @@ window.updateOrderStatus = async (id, newStatus, newPaymentStatus = null) => {
   }
 };
 
+const processedOrderIds = new Set();
+
 function setupSocketListeners() {
-  const handleIncomingOrder = (newOrder) => {
-    console.log('⚡ REAL-TIME INCOMING ORDER DETECTED:', newOrder);
+  const handleIncomingOrder = async (newOrder) => {
+    const orderId = newOrder._id || newOrder.id || newOrder.orderNumber;
+    if (!orderId || processedOrderIds.has(orderId)) return;
     
-    const isDashboard = document.getElementById('kpi-revenue');
-    if (isDashboard) fetchStats();
-    
-    // 1. Prevent duplicates
-    const exists = allOrdersData.some(o => (o._id === newOrder._id || o.id === newOrder.id));
-    if (!exists) {
-      allOrdersData.unshift(newOrder);
-      seenOrderIds.add(newOrder._id);
+    processedOrderIds.add(orderId);
+    console.log('⚡ Processing unique incoming order:', orderId);
+
+    // 1. Show single toast
+    if (typeof showToast === 'function') {
+      showToast(`🔔 New Order from Table ${newOrder.tableNumber || newOrder.table || '1'}!`, 'info');
     }
 
-    // 2. Re-render UI immediately
-    syncKitchenBellState(allOrdersData);
-    updateAllUI();
-
-    // 3. Trigger persistent chime if not muted
-    const isMuted = localStorage.getItem('glitch_sound_enabled') === 'false';
-    if (!isMuted && typeof playKitchenBell === 'function') {
+    // 2. Play chime
+    if (typeof playKitchenBell === 'function') {
       playKitchenBell();
     }
 
-    // 4. Show visual alert
-    if (typeof showToast === 'function') {
-      showToast(`🔔 New Order from Table ${newOrder.tableNumber || newOrder.table || 'N/A'}!`, 'info');
+    // 3. Immediately re-fetch and render all orders cleanly
+    if (typeof fetchAllOrders === 'function') {
+      await fetchAllOrders();
+      syncKitchenBellState(allOrdersData);
     }
   };
 
