@@ -746,7 +746,17 @@ window.openOrderDrawer = (orderId) => {
     <button class="w-full bg-monochrome-900 text-white font-bold py-3 rounded hover:bg-monochrome-800 transition-colors flex items-center justify-center" onclick="showToast('Printing KOT / Receipt...', 'error')">
       <i data-lucide="printer" class="h-4 w-4 mr-2"></i> Print Receipt
     </button>
-    ${!isPaid && order.status !== 'REJECTED' ? `<button class="w-full mt-3 bg-white border border-gray-300 text-monochrome-900 font-bold py-3 rounded hover:bg-gray-50 transition-colors" onclick="updateOrderStatus('${order._id}', null, 'PAID')">Mark as Paid</button>` : ''}
+    ${isPaid ? `
+      <div class="w-full mt-3 py-2.5 bg-green-50 text-green-700 font-semibold text-center rounded text-sm border border-green-200">
+        ✓ Paid via ${(order.paymentMethod || order.paymentMode || 'UPI').toUpperCase()}
+      </div>
+    ` : (order.status !== 'REJECTED' ? `
+      <div id="paymentActionContainer-${order._id}" class="mt-3">
+        <button onclick="window.showPaymentOptions('${order._id}')" class="w-full py-3 bg-white hover:bg-gray-50 text-gray-900 border border-gray-300 font-bold rounded transition">
+          Mark as Paid
+        </button>
+      </div>
+    ` : '')}
   `;
 
   if (order.status === 'PENDING') {
@@ -1257,3 +1267,74 @@ function setupSocketListeners() {
 
 // Run on load
 document.addEventListener('DOMContentLoaded', init);
+
+window.showPaymentOptions = (orderId) => {
+  const paymentBox = document.getElementById('paymentActionContainer-' + orderId);
+  if (!paymentBox) return;
+
+  paymentBox.innerHTML = `
+    <div class="space-y-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
+      <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider text-center">Select Payment Mode</p>
+      <div class="grid grid-cols-2 gap-2">
+        <button onclick="window.confirmPayment('${orderId}', 'CASH')" class="py-2.5 px-3 bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 font-semibold rounded-lg text-sm transition flex items-center justify-center gap-1.5 shadow-sm">
+          💵 Cash
+        </button>
+        <button onclick="window.confirmPayment('${orderId}', 'UPI')" class="py-2.5 px-3 bg-black hover:bg-gray-800 text-white font-semibold rounded-lg text-sm transition flex items-center justify-center gap-1.5 shadow-sm">
+          📱 UPI
+        </button>
+      </div>
+      <button onclick="window.resetPaymentOptions('${orderId}')" class="w-full py-1 text-xs text-gray-400 hover:text-gray-600 transition text-center">Cancel</button>
+    </div>
+  `;
+};
+
+window.resetPaymentOptions = (orderId) => {
+  const paymentBox = document.getElementById('paymentActionContainer-' + orderId);
+  if (paymentBox) {
+    paymentBox.innerHTML = `
+      <button onclick="window.showPaymentOptions('${orderId}')" class="w-full py-3 bg-white hover:bg-gray-50 text-gray-900 border border-gray-300 font-bold rounded transition">
+        Mark as Paid
+      </button>
+    `;
+  }
+};
+
+window.confirmPayment = async (orderId, method) => {
+  if (!orderId) return;
+  const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
+  const token = localStorage.getItem('glitch_admin_token') || localStorage.getItem('adminToken') || localStorage.getItem('token');
+
+  try {
+    const res = await fetch(`${apiBase}/orders/${orderId}/status`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({
+        paymentMethod: method,
+        paymentStatus: 'PAID'
+      })
+    });
+
+    if (res.ok) {
+      if (typeof showToast === 'function') {
+        showToast(`Order marked as Paid via ${method}!`, 'success');
+      }
+      
+      if (typeof fetchAllOrders === 'function') {
+        await fetchAllOrders();
+      }
+      
+      const updatedOrder = (window.allOrdersData || []).find(o => (o._id || o.id) === orderId);
+      if (updatedOrder) {
+        window.openOrderDetails(updatedOrder._id || updatedOrder.id);
+      }
+    } else {
+      if (typeof showToast === 'function') showToast('Failed to update payment status', 'error');
+    }
+  } catch (err) {
+    console.error('Payment update error:', err);
+    if (typeof showToast === 'function') showToast('Network error while updating payment', 'error');
+  }
+};
