@@ -884,12 +884,20 @@ window.updateOrderStatus = async (id, newStatus, newPaymentStatus = null) => {
   try {
     const payload = {};
     if (newStatus) payload.status = newStatus;
-    if (newPaymentStatus) payload.paymentStatus = newPaymentStatus;
+    if (newPaymentStatus) {
+      payload.paymentStatus = newPaymentStatus;
+      if (newPaymentStatus === 'PAID') {
+        payload.paymentMethod = 'UPI'; // Defaulting to UPI across admin panels where method is not specified
+      }
+    }
     
     const order = allOrdersData.find(o => o._id === id);
     if (order) {
       if (newStatus) order.status = newStatus;
-      if (newPaymentStatus) order.paymentStatus = newPaymentStatus;
+      if (newPaymentStatus) {
+        order.paymentStatus = newPaymentStatus;
+        if (newPaymentStatus === 'PAID') order.paymentMethod = 'UPI';
+      }
       updateAllUI();
     }
     

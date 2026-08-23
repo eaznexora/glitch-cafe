@@ -64,8 +64,6 @@ function updateDashboard(data) {
   if (data.payments) {
     document.getElementById('pay-upi').innerText = `${data.payments.upi}%`;
     document.getElementById('bar-upi').style.width = `${data.payments.upi}%`;
-    document.getElementById('pay-card').innerText = `${data.payments.card}%`;
-    document.getElementById('bar-card').style.width = `${data.payments.card}%`;
     document.getElementById('pay-cash').innerText = `${data.payments.cash}%`;
     document.getElementById('bar-cash').style.width = `${data.payments.cash}%`;
   }

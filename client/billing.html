@@ -197,7 +197,7 @@
         <!-- Payment Actions (Shown if Unpaid) -->
         <div id="drawer-payment-section" class="mb-6">
           <h4 class="font-bold text-sm text-gray-700 uppercase tracking-wider mb-3">Collect Payment</h4>
-          <div class="grid grid-cols-3 gap-2 mb-4">
+          <div class="grid grid-cols-2 gap-2 mb-4">
             <button class="pay-method-btn border-2 border-gray-200 rounded-lg py-3 flex flex-col items-center justify-center hover:border-black transition-colors" data-method="UPI">
               <i data-lucide="qr-code" class="h-6 w-6 mb-1 text-monochrome-900"></i>
               <span class="text-xs font-bold">UPI / QR</span>
@@ -205,10 +205,6 @@
             <button class="pay-method-btn border-2 border-gray-200 rounded-lg py-3 flex flex-col items-center justify-center hover:border-black transition-colors" data-method="CASH">
               <i data-lucide="banknote" class="h-6 w-6 mb-1 text-monochrome-900"></i>
               <span class="text-xs font-bold">Cash</span>
-            </button>
-            <button class="pay-method-btn border-2 border-gray-200 rounded-lg py-3 flex flex-col items-center justify-center hover:border-black transition-colors" data-method="CARD">
-              <i data-lucide="credit-card" class="h-6 w-6 mb-1 text-monochrome-900"></i>
-              <span class="text-xs font-bold">Card / POS</span>
             </button>
           </div>
           <input type="hidden" id="selected-payment-method" value="">

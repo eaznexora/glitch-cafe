@@ -61,7 +61,7 @@
       <!-- Torn Paper Header -->
       <header class="relative w-full overflow-hidden select-none bg-cover bg-bottom bg-no-repeat pt-5 pb-8 px-4" style="background-image: url('Header.png');">
         <div class="relative z-10 flex items-center justify-between">
-          <button class="text-white p-1 hover:opacity-80 transition cursor-pointer">
+          <button class="text-white p-1 hover:opacity-80 transition cursor-pointer" onclick="window.toggleCustomerDrawer()">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
           </button>
           <h1 class="font-extrabold italic text-white text-xl sm:text-2xl tracking-wide text-center drop-shadow-sm uppercase">The Glitch Cafe</h1>
@@ -267,6 +267,49 @@
           <button id="btn-auth-resend" class="text-xs font-bold text-black underline hidden hover:text-gray-700">Resend Code</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Customer Drawer Backdrop -->
+  <div id="customer-drawer-backdrop" class="fixed inset-0 bg-black/60 z-[9990] hidden opacity-0 transition-opacity duration-300" onclick="window.toggleCustomerDrawer()"></div>
+  
+  <!-- Customer Drawer -->
+  <div id="customer-drawer" class="fixed top-0 left-0 bottom-0 w-4/5 max-w-sm bg-white z-[9991] transform -translate-x-full transition-transform duration-300 flex flex-col hidden">
+    <!-- Header -->
+    <div class="p-6 border-b border-gray-100 bg-gray-50 flex-shrink-0">
+      <h3 class="text-xl font-bold text-black" id="drawer-customer-name">Guest</h3>
+      <p class="text-sm text-gray-500 mt-1" id="drawer-customer-details">Table 1</p>
+    </div>
+    <!-- Menu Items -->
+    <div class="flex-1 overflow-y-auto p-4 space-y-2">
+      <button onclick="window.openOrderHistory()" class="w-full text-left px-4 py-3 rounded-xl hover:bg-gray-100 transition-colors flex items-center gap-3">
+        <i data-lucide="shopping-bag" class="w-5 h-5 text-black"></i>
+        <span class="font-bold text-sm">My Previous Orders</span>
+      </button>
+      <button onclick="window.toggleCustomerDrawer(); window.location.href = window.BASE_PATH + '/track-order.html' + window.location.search" class="w-full text-left px-4 py-3 rounded-xl hover:bg-gray-100 transition-colors flex items-center gap-3">
+        <i data-lucide="clipboard-list" class="w-5 h-5 text-black"></i>
+        <span class="font-bold text-sm">Active Order Status</span>
+      </button>
+    </div>
+    <!-- Footer -->
+    <div class="p-4 border-t border-gray-100 flex-shrink-0">
+      <button onclick="window.customerSignOut()" class="w-full py-3 rounded-xl border border-red-200 bg-red-50 text-red-600 font-bold text-sm flex items-center justify-center gap-2 hover:bg-red-100 transition-colors">
+        <i data-lucide="log-out" class="w-4 h-4"></i> Sign Out
+      </button>
+    </div>
+  </div>
+
+  <!-- Previous Orders Modal -->
+  <div id="history-modal-backdrop" class="fixed inset-0 z-[9992] bg-black/40 opacity-0 hidden transition-opacity duration-300" onclick="window.closeOrderHistory()"></div>
+  <div id="history-modal" class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] p-6 shadow-2xl z-[9993] transform translate-y-full transition-transform duration-300 flex flex-col hidden max-h-[85vh]">
+    <div class="flex justify-between items-center mb-4 shrink-0">
+      <h3 class="text-xl font-extrabold text-black">Previous Orders</h3>
+      <button onclick="window.closeOrderHistory()" class="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full text-gray-500 hover:text-black hover:bg-gray-200">
+        <i data-lucide="x" class="h-4 w-4"></i>
+      </button>
+    </div>
+    <div id="history-list" class="overflow-y-auto space-y-4 flex-1 pr-2 no-scrollbar">
+      <!-- Injected via JS -->
     </div>
   </div>
 

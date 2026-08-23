@@ -895,3 +895,134 @@ function startResendTimer() {
     }
   }, 1000);
 }
+
+// Drawer and Order History Logic
+window.toggleCustomerDrawer = () => {
+  const drawer = document.getElementById('customer-drawer');
+  const backdrop = document.getElementById('customer-drawer-backdrop');
+  if (!drawer || !backdrop) return;
+  
+  // Set customer name/table if available
+  const customerStr = localStorage.getItem('glitch_customer');
+  const nameEl = document.getElementById('drawer-customer-name');
+  const detailEl = document.getElementById('drawer-customer-details');
+  if (nameEl && detailEl) {
+    if (customerStr) {
+      try {
+        const customer = JSON.parse(customerStr);
+        nameEl.innerText = customer.name || 'Guest';
+      } catch (e) {
+        nameEl.innerText = 'Guest';
+      }
+    } else {
+      nameEl.innerText = 'Guest';
+    }
+    const tableId = window.resolveAndPersistTable ? window.resolveAndPersistTable() : 'Walk-in';
+    detailEl.innerText = `Table ${tableId}`;
+  }
+
+  if (drawer.classList.contains('-translate-x-full')) {
+    drawer.classList.remove('-translate-x-full', 'hidden');
+    backdrop.classList.remove('hidden');
+    setTimeout(() => { backdrop.classList.remove('opacity-0'); }, 10);
+  } else {
+    drawer.classList.add('-translate-x-full');
+    backdrop.classList.add('opacity-0');
+    setTimeout(() => {
+      drawer.classList.add('hidden');
+      backdrop.classList.add('hidden');
+    }, 300);
+  }
+};
+
+window.customerSignOut = () => {
+  localStorage.removeItem('glitch_customer');
+  localStorage.removeItem('glitch_customer_phone');
+  localStorage.removeItem('glitch_customer_email');
+  sessionStorage.removeItem('glitch_customer');
+  window.location.reload();
+};
+
+window.openOrderHistory = async () => {
+  window.toggleCustomerDrawer(); // Close drawer
+  const customerStr = localStorage.getItem('glitch_customer');
+  if (!customerStr) {
+    showToast('Please sign in first to view history.', 'info');
+    return;
+  }
+  let customerEmail = '';
+  let customerPhone = localStorage.getItem('glitch_customer_phone') || '';
+  try {
+    const customer = JSON.parse(customerStr);
+    customerEmail = customer.email || '';
+  } catch(e) {}
+  
+  if (!customerPhone && !customerEmail) {
+    showToast('No prior order history found for this session.', 'info');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${window.API_BASE}/orders/history?phone=${encodeURIComponent(customerPhone)}&email=${encodeURIComponent(customerEmail)}`);
+    if (res.ok) {
+      const historyData = await res.json();
+      renderOrderHistoryModal(historyData.orders || historyData);
+    } else {
+      showToast('Failed to load history', 'error');
+    }
+  } catch (err) {
+    showToast('Error connecting to server', 'error');
+  }
+};
+
+window.closeOrderHistory = () => {
+  const modal = document.getElementById('history-modal');
+  const backdrop = document.getElementById('history-modal-backdrop');
+  if (modal && backdrop) {
+    modal.classList.add('translate-y-full');
+    backdrop.classList.add('opacity-0');
+    setTimeout(() => {
+      modal.classList.add('hidden');
+      backdrop.classList.add('hidden');
+    }, 300);
+  }
+};
+
+window.renderOrderHistoryModal = (orders) => {
+  const modal = document.getElementById('history-modal');
+  const backdrop = document.getElementById('history-modal-backdrop');
+  const list = document.getElementById('history-list');
+  if (!modal || !backdrop || !list) return;
+
+  if (!orders || orders.length === 0) {
+    list.innerHTML = `<div class="text-center text-gray-500 py-8">No previous orders found.</div>`;
+  } else {
+    list.innerHTML = orders.map(order => {
+      const date = new Date(order.createdAt).toLocaleDateString();
+      const statusColor = order.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 
+                          order.status === 'REJECTED' || order.status === 'CANCELLED' ? 'bg-red-100 text-red-700' : 
+                          'bg-yellow-100 text-yellow-700';
+      const itemsStr = order.items.map(i => `${i.quantity}x ${i.name}`).join(', ');
+      return `
+        <div class="p-4 border border-gray-100 rounded-2xl bg-gray-50 shadow-sm">
+          <div class="flex justify-between items-start mb-2">
+            <div>
+              <div class="font-bold text-black">${order.orderNumber}</div>
+              <div class="text-xs text-gray-500">${date}</div>
+            </div>
+            <span class="px-2 py-1 text-[10px] font-bold uppercase rounded-full ${statusColor}">${order.status}</span>
+          </div>
+          <div class="text-sm text-gray-600 mb-2 line-clamp-2">${itemsStr}</div>
+          <div class="font-bold text-black">₹${order.totalAmount}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  backdrop.classList.remove('hidden');
+  modal.classList.remove('hidden');
+  setTimeout(() => {
+    backdrop.classList.remove('opacity-0');
+    modal.classList.remove('translate-y-full');
+  }, 10);
+};

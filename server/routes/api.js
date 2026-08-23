@@ -109,9 +109,28 @@ router.get('/orders/pending', authMiddleware, async (req, res) => {
 // Get Order Status (for Customer Tracker)
 router.get('/orders/:id/status', async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id, 'status rejectionReason cancellationReason updatedAt');
+    const order = await Order.findById(req.params.id, 'status rejectionReason cancellationReason updatedAt items totals totalAmount subtotal tax');
     if (!order) return res.status(404).json({ error: 'Order not found' });
     res.json(order);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get Customer Order History
+router.get('/orders/history', async (req, res) => {
+  try {
+    const { phone, email } = req.query;
+    if (!phone && !email) {
+      return res.json([]);
+    }
+    
+    const filter = { $or: [] };
+    if (phone) filter.$or.push({ customerPhone: phone });
+    if (email) filter.$or.push({ customerEmail: email });
+    
+    const history = await Order.find(filter).sort({ createdAt: -1 });
+    res.json(history);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -393,9 +412,8 @@ router.get('/analytics', authMiddleware, async (req, res) => {
           { name: 'Chocolate Brownie', category: 'Desserts', units: 14, revenue: 2100 }
         ],
         payments: {
-          upi: 65,
-          card: 20,
-          cash: 15
+          upi: 80,
+          cash: 20
         },
         rejections: [
           { reason: 'Item Out of Stock', count: 2 },
@@ -411,18 +429,16 @@ router.get('/analytics', authMiddleware, async (req, res) => {
     const aov = settledOrders > 0 ? (revenue / settledOrders) : 0;
     
     // Basic Payment Breakdown
-    let upi = 0, card = 0, cash = 0;
+    let upi = 0, cash = 0;
     currentOrders.filter(o => o.paymentStatus === 'PAID').forEach(o => {
-      if (o.paymentMethod === 'CARD') card++;
-      else if (o.paymentMethod === 'CASH') cash++;
+      if (o.paymentMethod === 'CASH') cash++;
       else upi++; // Default to upi
     });
-    const totalPaid = upi + card + cash;
+    const totalPaid = upi + cash;
     const payments = totalPaid > 0 ? {
       upi: Math.round((upi/totalPaid)*100),
-      card: Math.round((card/totalPaid)*100),
       cash: Math.round((cash/totalPaid)*100)
-    } : { upi: 100, card: 0, cash: 0 };
+    } : { upi: 100, cash: 0 };
     
     // Top Items
     const itemMap = {};
