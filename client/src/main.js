@@ -747,17 +747,9 @@ window.openOrderDrawer = (orderId) => {
     <button class="w-full bg-monochrome-900 text-white font-bold py-3 rounded hover:bg-monochrome-800 transition-colors flex items-center justify-center" onclick="showToast('Printing KOT / Receipt...', 'error')">
       <i data-lucide="printer" class="h-4 w-4 mr-2"></i> Print Receipt
     </button>
-    ${isPaid ? `
-      <div class="w-full mt-3 py-2.5 bg-green-50 text-green-700 font-semibold text-center rounded text-sm border border-green-200">
-        ✓ Paid via ${(order.paymentMethod || order.paymentMode || 'UPI').toUpperCase()}
-      </div>
-    ` : (order.status !== 'REJECTED' ? `
-      <div id="paymentActionContainer" class="mt-3">
-        <button type="button" onclick="window.showPaymentOptions()" class="w-full py-2.5 bg-white hover:bg-gray-50 text-gray-900 border border-gray-300 font-semibold rounded-lg text-sm transition shadow-sm">
-          Mark as Paid
-        </button>
-      </div>
-    ` : '')}
+    <div id="paymentActionContainer" class="w-full mt-3">
+      <!-- Dynamic: Rendered by renderPaymentButtonState() -->
+    </div>
   `;
 
   if (order.status === 'PENDING') {
@@ -778,6 +770,12 @@ window.openOrderDrawer = (orderId) => {
   if (typeof lucide !== 'undefined') lucide.createIcons();
   drawer.classList.remove('translate-x-full');
   backdrop.classList.remove('hidden');
+
+  if (order.status !== 'REJECTED') {
+    if (typeof window.renderPaymentButtonState === 'function') {
+      window.renderPaymentButtonState(order);
+    }
+  }
 };
 
 window.removeOrderItem = async (orderId, itemIndex) => {
@@ -1269,37 +1267,73 @@ function setupSocketListeners() {
 // Run on load
 document.addEventListener('DOMContentLoaded', init);
 
+// Remove any legacy markAsPaid listener if present
+window.markAsPaid = undefined;
+
+window.renderPaymentButtonState = function(order) {
+  const container = document.getElementById('paymentActionContainer');
+  if (!container) return;
+
+  const isPaid = (order.paymentStatus || '').toUpperCase() === 'PAID';
+  const method = (order.paymentMethod || order.paymentMode || 'UPI').toUpperCase();
+
+  if (isPaid) {
+    container.innerHTML = `
+      <div class="w-full py-2.5 bg-green-50 text-green-700 font-semibold text-center rounded-lg text-sm border border-green-200">
+        ✓ Paid via ${method}
+      </div>
+    `;
+  } else {
+    container.innerHTML = `
+      <button type="button" id="triggerPaymentOptionsBtn" class="w-full py-2.5 bg-white hover:bg-gray-50 text-gray-900 border border-gray-300 font-semibold rounded-lg text-sm transition shadow-sm">
+        Mark as Paid
+      </button>
+    `;
+
+    document.getElementById('triggerPaymentOptionsBtn').onclick = (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      window.showPaymentOptions();
+    };
+  }
+};
+
 window.showPaymentOptions = function() {
-  const container = document.getElementById('paymentActionContainer') || document.getElementById('paymentBox');
+  const container = document.getElementById('paymentActionContainer');
   if (!container) return;
 
   container.innerHTML = `
-    <div class="space-y-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
+    <div class="space-y-2 p-2 bg-gray-50 rounded-lg border border-gray-200 animate-in fade-in duration-150">
       <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider text-center">Select Payment Mode</p>
       <div class="grid grid-cols-2 gap-2">
-        <button type="button" onclick="window.confirmPayment('CASH')" class="py-2.5 px-3 bg-white border border-gray-300 hover:bg-gray-100 text-gray-900 font-semibold rounded-lg text-sm transition flex items-center justify-center shadow-sm">
+        <button type="button" id="selectCashBtn" class="py-2.5 px-3 bg-white border border-gray-300 hover:bg-gray-100 text-gray-900 font-semibold rounded-lg text-sm transition text-center shadow-sm">
           Cash
         </button>
-        <button type="button" onclick="window.confirmPayment('UPI')" class="py-2.5 px-3 bg-black hover:bg-gray-800 text-white font-semibold rounded-lg text-sm transition flex items-center justify-center shadow-sm">
+        <button type="button" id="selectUpiBtn" class="py-2.5 px-3 bg-black hover:bg-gray-800 text-white font-semibold rounded-lg text-sm transition text-center shadow-sm">
           UPI
         </button>
       </div>
-      <button type="button" onclick="window.resetPaymentOptions()" class="w-full py-1 text-xs text-gray-400 hover:text-gray-600 transition text-center">
+      <button type="button" id="cancelPaymentBtn" class="w-full py-1 text-xs text-gray-400 hover:text-gray-600 transition text-center">
         Cancel
       </button>
     </div>
   `;
-};
 
-window.resetPaymentOptions = function() {
-  const container = document.getElementById('paymentActionContainer') || document.getElementById('paymentBox');
-  if (!container) return;
+  document.getElementById('selectCashBtn').onclick = (e) => {
+    e.stopPropagation();
+    window.confirmPayment('CASH');
+  };
 
-  container.innerHTML = `
-    <button type="button" onclick="window.showPaymentOptions()" class="w-full py-2.5 bg-white hover:bg-gray-50 text-gray-900 border border-gray-300 font-semibold rounded-lg text-sm transition shadow-sm">
-      Mark as Paid
-    </button>
-  `;
+  document.getElementById('selectUpiBtn').onclick = (e) => {
+    e.stopPropagation();
+    window.confirmPayment('UPI');
+  };
+
+  document.getElementById('cancelPaymentBtn').onclick = (e) => {
+    e.stopPropagation();
+    const currentOrder = (window.allOrdersData || []).find(o => (o._id || o.id) === window.currentSelectedOrderId);
+    if (currentOrder) window.renderPaymentButtonState(currentOrder);
+  };
 };
 
 window.confirmPayment = async function(method) {
@@ -1315,7 +1349,7 @@ window.confirmPayment = async function(method) {
         ...(token ? { 'Authorization': `Bearer ${token}` } : {})
       },
       body: JSON.stringify({
-        paymentMethod: method, // 'CASH' or 'UPI'
+        paymentMethod: method,
         paymentStatus: 'PAID'
       })
     });
@@ -1325,7 +1359,7 @@ window.confirmPayment = async function(method) {
         showToast(`Order marked as Paid via ${method}!`, 'success');
       }
 
-      // Close the Order Details drawer immediately
+      // Close the sidebar immediately
       if (typeof closeOrderDetails === 'function') {
         closeOrderDetails();
       } else {
@@ -1337,7 +1371,7 @@ window.confirmPayment = async function(method) {
         if (backdrop) backdrop.classList.add('hidden');
       }
 
-      // Refresh orders table to update badges and dashboard breakdown
+      // Refresh orders list
       if (typeof fetchAllOrders === 'function') {
         await fetchAllOrders();
       }
