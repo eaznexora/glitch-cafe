@@ -688,6 +688,7 @@ window.openOrderDrawer = (orderId) => {
   const backdrop = document.getElementById('drawer-backdrop');
   if (!drawer || !backdrop) return;
   
+  window.currentSelectedOrderId = orderId;
   const order = allOrdersData.find(o => o._id === orderId);
   if (!order) return;
 
@@ -751,8 +752,8 @@ window.openOrderDrawer = (orderId) => {
         ✓ Paid via ${(order.paymentMethod || order.paymentMode || 'UPI').toUpperCase()}
       </div>
     ` : (order.status !== 'REJECTED' ? `
-      <div id="paymentActionContainer-${order._id}" class="mt-3">
-        <button onclick="window.showPaymentOptions('${order._id}')" class="w-full py-3 bg-white hover:bg-gray-50 text-gray-900 border border-gray-300 font-bold rounded transition">
+      <div id="paymentActionContainer" class="mt-3">
+        <button type="button" onclick="window.showPaymentOptions()" class="w-full py-2.5 bg-white hover:bg-gray-50 text-gray-900 border border-gray-300 font-semibold rounded-lg text-sm transition shadow-sm">
           Mark as Paid
         </button>
       </div>
@@ -1268,51 +1269,53 @@ function setupSocketListeners() {
 // Run on load
 document.addEventListener('DOMContentLoaded', init);
 
-window.showPaymentOptions = (orderId) => {
-  const paymentBox = document.getElementById('paymentActionContainer-' + orderId);
-  if (!paymentBox) return;
+window.showPaymentOptions = function() {
+  const container = document.getElementById('paymentActionContainer') || document.getElementById('paymentBox');
+  if (!container) return;
 
-  paymentBox.innerHTML = `
+  container.innerHTML = `
     <div class="space-y-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
       <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider text-center">Select Payment Mode</p>
       <div class="grid grid-cols-2 gap-2">
-        <button onclick="window.confirmPayment('${orderId}', 'CASH')" class="py-2.5 px-3 bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 font-semibold rounded-lg text-sm transition flex items-center justify-center gap-1.5 shadow-sm">
+        <button type="button" onclick="window.confirmPayment('CASH')" class="py-2.5 px-3 bg-white border border-gray-300 hover:bg-gray-100 text-gray-900 font-semibold rounded-lg text-sm transition flex items-center justify-center shadow-sm">
           Cash
         </button>
-        <button onclick="window.confirmPayment('${orderId}', 'UPI')" class="py-2.5 px-3 bg-black hover:bg-gray-800 text-white font-semibold rounded-lg text-sm transition flex items-center justify-center gap-1.5 shadow-sm">
+        <button type="button" onclick="window.confirmPayment('UPI')" class="py-2.5 px-3 bg-black hover:bg-gray-800 text-white font-semibold rounded-lg text-sm transition flex items-center justify-center shadow-sm">
           UPI
         </button>
       </div>
-      <button onclick="window.resetPaymentOptions('${orderId}')" class="w-full py-1 text-xs text-gray-400 hover:text-gray-600 transition text-center">Cancel</button>
+      <button type="button" onclick="window.resetPaymentOptions()" class="w-full py-1 text-xs text-gray-400 hover:text-gray-600 transition text-center">
+        Cancel
+      </button>
     </div>
   `;
 };
 
-window.resetPaymentOptions = (orderId) => {
-  const paymentBox = document.getElementById('paymentActionContainer-' + orderId);
-  if (paymentBox) {
-    paymentBox.innerHTML = `
-      <button onclick="window.showPaymentOptions('${orderId}')" class="w-full py-3 bg-white hover:bg-gray-50 text-gray-900 border border-gray-300 font-bold rounded transition">
-        Mark as Paid
-      </button>
-    `;
-  }
+window.resetPaymentOptions = function() {
+  const container = document.getElementById('paymentActionContainer') || document.getElementById('paymentBox');
+  if (!container) return;
+
+  container.innerHTML = `
+    <button type="button" onclick="window.showPaymentOptions()" class="w-full py-2.5 bg-white hover:bg-gray-50 text-gray-900 border border-gray-300 font-semibold rounded-lg text-sm transition shadow-sm">
+      Mark as Paid
+    </button>
+  `;
 };
 
-window.confirmPayment = async (orderId, method) => {
-  if (!orderId) return;
+window.confirmPayment = async function(method) {
+  if (!window.currentSelectedOrderId) return;
   const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
-  const token = localStorage.getItem('glitch_admin_token') || localStorage.getItem('adminToken') || localStorage.getItem('token');
+  const token = localStorage.getItem('glitch_admin_token') || localStorage.getItem('token');
 
   try {
-    const res = await fetch(`${apiBase}/orders/${orderId}/status`, {
+    const res = await fetch(`${apiBase}/orders/${window.currentSelectedOrderId}/status`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { 'Authorization': `Bearer ${token}` } : {})
       },
       body: JSON.stringify({
-        paymentMethod: method,
+        paymentMethod: method, // 'CASH' or 'UPI'
         paymentStatus: 'PAID'
       })
     });
@@ -1321,20 +1324,20 @@ window.confirmPayment = async (orderId, method) => {
       if (typeof showToast === 'function') {
         showToast(`Order marked as Paid via ${method}!`, 'success');
       }
-      
-      // Close the Order Details sidebar/drawer
+
+      // Close the Order Details drawer immediately
       if (typeof closeOrderDetails === 'function') {
         closeOrderDetails();
       } else {
         const closeBtn = document.querySelector('#closeOrderDetailsBtn, [data-action="close-order-details"]');
         if (closeBtn) closeBtn.click();
         const drawer = document.querySelector('#drawer, #orderDetailsDrawer, #orderDrawer');
-        if (drawer) drawer.classList.add('translate-x-full');
+        if (drawer) drawer.classList.add('hidden', 'translate-x-full');
         const backdrop = document.getElementById('drawer-backdrop');
         if (backdrop) backdrop.classList.add('hidden');
       }
 
-      // Refresh orders list to update table badges and metrics
+      // Refresh orders table to update badges and dashboard breakdown
       if (typeof fetchAllOrders === 'function') {
         await fetchAllOrders();
       }
@@ -1342,7 +1345,7 @@ window.confirmPayment = async (orderId, method) => {
       if (typeof showToast === 'function') showToast('Failed to update payment status', 'error');
     }
   } catch (err) {
-    console.error('Payment update error:', err);
+    console.error('Payment confirmation error:', err);
     if (typeof showToast === 'function') showToast('Network error while updating payment', 'error');
   }
 };
