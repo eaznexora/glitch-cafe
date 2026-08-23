@@ -1407,11 +1407,13 @@ window.confirmPayment = async function(method) {
 // Remove old legacy function if defined
 window.printReceipt = undefined;
 
-window.generateReceiptPDF = async function() {
-  // 1. Resolve Active Order
+window.generateReceiptPDF = function() {
   let order = window.currentActiveOrder;
   if (!order && window.currentSelectedOrderId) {
     order = (window.allOrdersData || []).find(o => (o._id || o.id || o.orderNumber) === window.currentSelectedOrderId);
+  }
+  if (!order && Array.isArray(window.allOrdersData) && window.allOrdersData.length > 0) {
+    order = window.allOrdersData[0];
   }
 
   if (!order) {
@@ -1419,7 +1421,7 @@ window.generateReceiptPDF = async function() {
     return;
   }
 
-  // 2. Fetch Settings from localStorage or defaults
+  // Read latest live settings from localStorage
   let settings = {
     restaurantName: 'Glitch Cafe',
     address: '123 Web Dev Lane, Tech City, 10001',
@@ -1433,11 +1435,10 @@ window.generateReceiptPDF = async function() {
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
-      Object.assign(settings, parsed);
+      settings = { ...settings, ...parsed };
     } catch (e) {}
   }
 
-  // 3. Format Details
   const orderDate = new Date(order.createdAt || order.date || Date.now());
   const dateStr = orderDate.toLocaleDateString('en-GB');
   const timeStr = orderDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -1455,14 +1456,14 @@ window.generateReceiptPDF = async function() {
     const qty = item.quantity || item.qty || 1;
     const price = (parseFloat(item.price || 0) * qty).toFixed(2);
     return `
-      <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 13px;">
         <span style="max-width: 65%; word-break: break-word;">${qty} x ${item.name}</span>
         <span style="font-weight: 600;">₹${price}</span>
       </div>
     `;
   }).join('');
 
-  // 4. Construct Thermal Receipt HTML Content
+  // Thermal Receipt Component with explicit UTF-8 encoding
   const receiptBody = `
     <div id="thermalReceiptContent" style="width: 76mm; margin: 0 auto; padding: 14px 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #000; font-size: 12px; line-height: 1.35; background: #fff;">
       <div style="text-align: center;">
@@ -1528,11 +1529,13 @@ window.generateReceiptPDF = async function() {
     </div>
   `;
 
-  // 5. Action 1: Open the receipt in a new tab immediately
+  // 1. Open Clean UTF-8 Tab
   const fullHtmlPage = `
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
+      <meta charset="UTF-8">
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
       <title>Receipt - ${invoiceNo}</title>
       <style>
         body { margin: 0; padding: 20px; background: #f3f4f6; display: flex; justify-content: center; }
@@ -1545,11 +1548,11 @@ window.generateReceiptPDF = async function() {
     </body>
     </html>
   `;
-  const receiptBlob = new Blob([fullHtmlPage], { type: 'text/html' });
+  const receiptBlob = new Blob([fullHtmlPage], { type: 'text/html;charset=UTF-8' });
   const tabUrl = URL.createObjectURL(receiptBlob);
   window.open(tabUrl, '_blank');
 
-  // 6. Action 2: Trigger automatic PDF download via html2pdf
+  // 2. Download Clean PDF
   const tempContainer = document.createElement('div');
   tempContainer.style.position = 'fixed';
   tempContainer.style.left = '-9999px';
@@ -1557,28 +1560,26 @@ window.generateReceiptPDF = async function() {
   document.body.appendChild(tempContainer);
 
   const opt = {
-    margin: [5, 2, 5, 2],
+    margin: [4, 2, 4, 2],
     filename: `Receipt-${invoiceNo}.pdf`,
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
-    jsPDF: { unit: 'mm', format: [80, 240], orientation: 'portrait' }
+    html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+    jsPDF: { unit: 'mm', format: [80, 230], orientation: 'portrait' }
+  };
+
+  const runDownload = () => {
+    window.html2pdf().set(opt).from(tempContainer.querySelector('#thermalReceiptContent')).save().then(() => {
+      if (tempContainer.parentNode) document.body.removeChild(tempContainer);
+      if (typeof showToast === 'function') showToast(`Receipt ${invoiceNo}.pdf downloaded!`, 'success');
+    });
   };
 
   if (window.html2pdf) {
-    window.html2pdf().set(opt).from(tempContainer.querySelector('#thermalReceiptContent')).save().then(() => {
-      document.body.removeChild(tempContainer);
-      if (typeof showToast === 'function') showToast(`Receipt ${invoiceNo}.pdf downloaded!`, 'success');
-    });
+    runDownload();
   } else {
-    // Dynamic script fallback if html2pdf wasn't preloaded
     const script = document.createElement('script');
     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-    script.onload = () => {
-      window.html2pdf().set(opt).from(tempContainer.querySelector('#thermalReceiptContent')).save().then(() => {
-        document.body.removeChild(tempContainer);
-        if (typeof showToast === 'function') showToast(`Receipt ${invoiceNo}.pdf downloaded!`, 'success');
-      });
-    };
+    script.onload = runDownload;
     document.head.appendChild(script);
   }
 };

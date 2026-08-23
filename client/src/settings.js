@@ -177,3 +177,41 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+window.saveCafeProfile = async function(event) {
+  if (event) event.preventDefault();
+  
+  const settingsData = {
+    restaurantName: document.querySelector('#cafe-name, #restaurantName, [name="restaurantName"]')?.value || 'Glitch Cafe',
+    taxId: document.querySelector('#cafe-gst, #taxId, [name="taxId"], #gstin')?.value || '',
+    address: document.querySelector('#cafe-address, #businessAddress, [name="address"], textarea')?.value || '',
+    contactNumber: document.querySelector('#cafe-phone, #contactNumber, [name="contactNumber"], [name="phone"]')?.value || '',
+    currencySymbol: document.querySelector('#currencySymbol, [name="currencySymbol"]')?.value || '₹',
+    invoiceFooter: document.querySelector('#cafe-footer, #invoiceFooter, [name="invoiceFooterNote"], [name="invoiceFooter"]')?.value || 'THANK YOU. VISIT AGAIN.\nTHANK YOU'
+  };
+
+  // 1. Immediately store in localStorage so all tabs and receipt generator access it instantly
+  localStorage.setItem('cafe_settings', JSON.stringify(settingsData));
+  localStorage.setItem('glitch_cafe_profile', JSON.stringify(settingsData));
+
+  // 2. Optional backend sync
+  const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
+  const token = localStorage.getItem('glitch_admin_token') || localStorage.getItem('token');
+  try {
+    await fetch(`${apiBase}/settings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify(settingsData)
+    });
+  } catch (e) {
+    console.warn('Backend settings sync failed, cached locally');
+  }
+
+  if (typeof showToast === 'function') {
+    showToast('Cafe settings updated successfully!', 'success');
+  }
+};
+
