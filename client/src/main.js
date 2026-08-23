@@ -744,8 +744,8 @@ window.openOrderDrawer = (orderId) => {
   `;
 
   let actionsHtml = `
-    <button class="w-full bg-monochrome-900 text-white font-bold py-3 rounded hover:bg-monochrome-800 transition-colors flex items-center justify-center" onclick="showToast('Printing KOT / Receipt...', 'error')">
-      <i data-lucide="printer" class="h-4 w-4 mr-2"></i> Print Receipt
+    <button id="printReceiptBtn" onclick="window.printOrderReceipt()" class="w-full py-2.5 bg-black hover:bg-gray-800 text-white font-medium rounded-lg text-sm flex items-center justify-center gap-2 transition">
+      🖨️ Print Receipt
     </button>
     <div id="paymentActionContainer" class="w-full mt-3">
       <!-- Dynamic: Rendered by renderPaymentButtonState() -->
@@ -1400,5 +1400,203 @@ window.confirmPayment = async function(method) {
     if (typeof showToast === 'function') {
       showToast('Network error while updating payment', 'error');
     }
+  }
+};
+
+window.printOrderReceipt = async function(orderId) {
+  const targetId = orderId || window.currentSelectedOrderId;
+  if (!targetId) {
+    if (typeof showToast === 'function') showToast('No order selected for receipt generation', 'error');
+    return;
+  }
+
+  const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
+  const token = localStorage.getItem('glitch_admin_token') || localStorage.getItem('token');
+
+  try {
+    // 1. Fetch Order Details & Cafe Settings in parallel
+    const [orderRes, settingsRes] = await Promise.all([
+      fetch(`${apiBase}/orders/${targetId}`, { headers: token ? { 'Authorization': `Bearer ${token}` } : {} }),
+      fetch(`${apiBase}/settings/profile`, { headers: token ? { 'Authorization': `Bearer ${token}` } : {} }).catch(() => null)
+    ]);
+
+    let order = null;
+    if (orderRes.ok) {
+      const orderJson = await orderRes.json();
+      order = orderJson.data || orderJson.order || orderJson;
+    } else {
+      order = (window.allOrdersData || []).find(o => (o._id || o.id || o.orderNumber) === targetId);
+    }
+
+    if (!order) {
+      if (typeof showToast === 'function') showToast('Order data not found', 'error');
+      return;
+    }
+
+    let settings = {
+      restaurantName: 'Glitch Cafe',
+      address: '123 Web Dev Lane, Tech City, 10001',
+      contactNumber: '+91 98765 43210',
+      taxId: '22AAAAA0000A1Z5',
+      currencySymbol: '₹',
+      invoiceFooter: 'THANK YOU. VISIT AGAIN.\nTHANK YOU'
+    };
+
+    if (settingsRes && settingsRes.ok) {
+      const sJson = await settingsRes.json();
+      const sData = sJson.data || sJson.settings || sJson;
+      if (sData) {
+        settings = {
+          restaurantName: sData.restaurantName || sData.name || settings.restaurantName,
+          address: sData.address || settings.address,
+          contactNumber: sData.contactNumber || sData.phone || settings.contactNumber,
+          taxId: sData.taxId || sData.gstin || settings.taxId,
+          currencySymbol: sData.currencySymbol || settings.currencySymbol,
+          invoiceFooter: sData.invoiceFooterNote || sData.invoiceFooter || settings.invoiceFooter
+        };
+      }
+    }
+
+    // 2. Initialize jsPDF in 80mm POS Thermal Receipt Format
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: [80, 220] // standard 80mm thermal receipt roll dimensions
+    });
+
+    let y = 10;
+    const leftX = 5;
+    const rightX = 75;
+    const centerX = 40;
+
+    // Header: Restaurant Name & Address
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text(settings.restaurantName, centerX, y, { align: 'center' });
+    y += 5;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    const splitAddress = doc.splitTextToSize(settings.address, 68);
+    doc.text(splitAddress, centerX, y, { align: 'center' });
+    y += splitAddress.length * 3.8;
+
+    if (settings.contactNumber) {
+      doc.text(`CONTACT NO: ${settings.contactNumber}`, centerX, y, { align: 'center' });
+      y += 4;
+    }
+    if (settings.taxId) {
+      doc.text(`GSTIN: ${settings.taxId}`, centerX, y, { align: 'center' });
+      y += 4;
+    }
+
+    // Divider
+    y += 1;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(leftX, y, rightX, y);
+    y += 4;
+
+    // Date, Time & Table Info
+    const orderDate = new Date(order.createdAt || order.date || Date.now());
+    const dateStr = orderDate.toLocaleDateString('en-GB'); // DD/MM/YYYY
+    const timeStr = orderDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const tableStr = order.table ? (order.table.startsWith('Table') ? order.table : `Table: ${order.table}`) : 'Table 1';
+
+    doc.setFontSize(8);
+    doc.text(`Date: ${dateStr}`, leftX, y);
+    doc.text(`Time: ${timeStr}`, centerX - 5, y);
+    doc.text(tableStr, rightX, y, { align: 'right' });
+    y += 4;
+
+    doc.line(leftX, y, rightX, y);
+    y += 4.5;
+
+    // Invoice Meta (Receipt No, Customer, Payment Mode)
+    const invoiceNo = order.orderNumber || `INV-${orderDate.getFullYear()}-${(order._id || '0000').slice(-4).toUpperCase()}`;
+    const customerName = order.customerName || order.customer || 'Walk-in Guest';
+    const paymentMode = (order.paymentMethod || order.paymentMode || (order.paymentStatus === 'PAID' ? 'CASH' : 'UNPAID')).toLowerCase();
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('RECEIPT NO -', leftX, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(invoiceNo, rightX, y, { align: 'right' });
+    y += 4;
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('CUSTOMER -', leftX, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(customerName, rightX, y, { align: 'right' });
+    y += 4;
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('PAYMENT MODE -', leftX, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(paymentMode, rightX, y, { align: 'right' });
+    y += 5;
+
+    // Items Section
+    const items = Array.isArray(order.items) ? order.items : [];
+    items.forEach(item => {
+      const qty = item.quantity || item.qty || 1;
+      const price = parseFloat(item.price || 0) * qty;
+      const itemName = `${qty} x ${item.name}`;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      
+      const splitName = doc.splitTextToSize(itemName, 48);
+      doc.text(splitName, leftX, y);
+      doc.text(`Rs. ${price.toFixed(2)}`, rightX, y, { align: 'right' });
+      y += Math.max(splitName.length * 4, 4.5);
+    });
+
+    // Divider
+    y += 1;
+    doc.line(leftX, y, rightX, y);
+    y += 4.5;
+
+    // Calculations
+    const subtotal = items.reduce((sum, i) => sum + (parseFloat(i.price || 0) * (i.quantity || 1)), 0);
+    const taxes = parseFloat(order.tax || order.taxes || 0);
+    const grandTotal = parseFloat(order.total || order.totalAmount || (subtotal + taxes));
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.text('SUBTOTAL:', leftX, y);
+    doc.text(`Rs. ${subtotal.toFixed(2)}`, rightX, y, { align: 'right' });
+    y += 4;
+
+    if (taxes > 0) {
+      doc.text('CGST (2.5%):', leftX, y);
+      doc.text(`Rs. ${(taxes / 2).toFixed(2)}`, rightX, y, { align: 'right' });
+      y += 4;
+      doc.text('SGST (2.5%):', leftX, y);
+      doc.text(`Rs. ${(taxes / 2).toFixed(2)}`, rightX, y, { align: 'right' });
+      y += 4;
+    }
+
+    doc.setFontSize(10);
+    doc.text('TOTAL:', leftX, y);
+    doc.text(`Rs. ${grandTotal.toFixed(2)}`, rightX, y, { align: 'right' });
+    y += 6;
+
+    // Footer
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    const footerLines = doc.splitTextToSize(settings.invoiceFooter, 68);
+    doc.text(footerLines, centerX, y, { align: 'center' });
+
+    // 3. Open PDF in print preview / save as blob
+    doc.autoPrint();
+    const pdfBlobUrl = doc.output('bloburl');
+    window.open(pdfBlobUrl, '_blank');
+
+    if (typeof showToast === 'function') {
+      showToast('Receipt PDF generated successfully!', 'success');
+    }
+  } catch (err) {
+    console.error('PDF Receipt Generation Error:', err);
+    if (typeof showToast === 'function') showToast('Failed to generate PDF receipt', 'error');
   }
 };
