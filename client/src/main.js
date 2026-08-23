@@ -1336,21 +1336,36 @@ window.showPaymentOptions = function() {
   };
 };
 
+function getAdminAuthHeaders() {
+  const token = localStorage.getItem('glitch_admin_token') || 
+                localStorage.getItem('adminToken') || 
+                localStorage.getItem('token') || 
+                localStorage.getItem('glitch_token') || 
+                sessionStorage.getItem('glitch_admin_token') || 
+                sessionStorage.getItem('token');
+
+  const headers = {
+    'Content-Type': 'application/json'
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token.trim()}`;
+  }
+  return headers;
+}
+
 window.confirmPayment = async function(method) {
   if (!window.currentSelectedOrderId) return;
   const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
-  const token = localStorage.getItem('glitch_admin_token') || localStorage.getItem('token');
 
   try {
     const res = await fetch(`${apiBase}/orders/${window.currentSelectedOrderId}/status`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      },
+      headers: getAdminAuthHeaders(),
       body: JSON.stringify({
-        paymentMethod: method,
-        paymentStatus: 'PAID'
+        paymentMethod: method, // 'CASH' or 'UPI'
+        paymentStatus: 'PAID',
+        isPaid: true
       })
     });
 
@@ -1359,27 +1374,31 @@ window.confirmPayment = async function(method) {
         showToast(`Order marked as Paid via ${method}!`, 'success');
       }
 
-      // Close the sidebar immediately
+      // Close Order Details slide-over drawer
       if (typeof closeOrderDetails === 'function') {
         closeOrderDetails();
       } else {
         const closeBtn = document.querySelector('#closeOrderDetailsBtn, [data-action="close-order-details"]');
         if (closeBtn) closeBtn.click();
-        const drawer = document.querySelector('#drawer, #orderDetailsDrawer, #orderDrawer');
+        const drawer = document.querySelector('#orderDetailsDrawer, #orderDrawer');
         if (drawer) drawer.classList.add('hidden', 'translate-x-full');
-        const backdrop = document.getElementById('drawer-backdrop');
-        if (backdrop) backdrop.classList.add('hidden');
       }
 
-      // Refresh orders list
+      // Refresh orders table to update the badges in place
       if (typeof fetchAllOrders === 'function') {
         await fetchAllOrders();
       }
     } else {
-      if (typeof showToast === 'function') showToast('Failed to update payment status', 'error');
+      const errData = await res.json().catch(() => ({}));
+      console.error('Payment PATCH error:', res.status, errData);
+      if (typeof showToast === 'function') {
+        showToast(errData.message || `Failed to update payment status (${res.status})`, 'error');
+      }
     }
   } catch (err) {
-    console.error('Payment confirmation error:', err);
-    if (typeof showToast === 'function') showToast('Network error while updating payment', 'error');
+    console.error('Payment execution error:', err);
+    if (typeof showToast === 'function') {
+      showToast('Network error while updating payment', 'error');
+    }
   }
 };
