@@ -176,42 +176,87 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  loadCafeProfileSettings();
 });
 
-window.saveCafeProfile = async function(event) {
-  if (event) event.preventDefault();
-  
-  const settingsData = {
-    restaurantName: document.querySelector('#cafe-name, #restaurantName, [name="restaurantName"]')?.value || 'Glitch Cafe',
-    taxId: document.querySelector('#cafe-gst, #taxId, [name="taxId"], #gstin')?.value || '',
-    address: document.querySelector('#cafe-address, #businessAddress, [name="address"], textarea')?.value || '',
-    contactNumber: document.querySelector('#cafe-phone, #contactNumber, [name="contactNumber"], [name="phone"]')?.value || '',
-    currencySymbol: document.querySelector('#currencySymbol, [name="currencySymbol"]')?.value || '₹',
-    invoiceFooter: document.querySelector('#cafe-footer, #invoiceFooter, [name="invoiceFooterNote"], [name="invoiceFooter"]')?.value || 'THANK YOU. VISIT AGAIN.\nTHANK YOU'
+function loadCafeProfileSettings() {
+  const defaults = {
+    restaurantName: 'Glitch Cafe',
+    taxId: '22AAAAA0000A1Z5',
+    address: '123 Web Dev Lane, Tech City, 10001',
+    contactNumber: '+91 98765 43210',
+    currencySymbol: '₹',
+    invoiceFooter: 'Thank you for visiting! Have a glitch-free day.'
   };
 
-  // 1. Immediately store in localStorage so all tabs and receipt generator access it instantly
-  localStorage.setItem('cafe_settings', JSON.stringify(settingsData));
-  localStorage.setItem('glitch_cafe_profile', JSON.stringify(settingsData));
+  const stored = localStorage.getItem('cafe_settings') || localStorage.getItem('cafe_profile_settings');
+  let settings = defaults;
 
-  // 2. Optional backend sync
-  const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
-  const token = localStorage.getItem('glitch_admin_token') || localStorage.getItem('token');
-  try {
-    await fetch(`${apiBase}/settings`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      },
-      body: JSON.stringify(settingsData)
-    });
-  } catch (e) {
-    console.warn('Backend settings sync failed, cached locally');
+  if (stored) {
+    try {
+      settings = { ...defaults, ...JSON.parse(stored) };
+    } catch (e) {
+      console.warn('Failed to parse stored settings, using defaults');
+    }
   }
 
+  // Populate inputs
+  const nameEl = document.getElementById('restaurantNameInput') || document.querySelector('input[name="restaurantName"]');
+  const taxEl = document.getElementById('taxIdInput') || document.querySelector('input[name="taxId"]');
+  const addrEl = document.getElementById('addressInput') || document.querySelector('textarea[name="address"]') || document.querySelector('input[name="address"]');
+  const phoneEl = document.getElementById('contactNumberInput') || document.querySelector('input[name="contactNumber"]');
+  const currEl = document.getElementById('currencySymbolInput') || document.querySelector('input[name="currencySymbol"]');
+  const footEl = document.getElementById('invoiceFooterInput') || document.querySelector('textarea[name="invoiceFooter"]') || document.querySelector('input[name="invoiceFooter"]');
+
+  if (nameEl) nameEl.value = settings.restaurantName;
+  if (taxEl) taxEl.value = settings.taxId;
+  if (addrEl) addrEl.value = settings.address;
+  if (phoneEl) phoneEl.value = settings.contactNumber;
+  if (currEl) currEl.value = settings.currencySymbol;
+  if (footEl) footEl.value = settings.invoiceFooter;
+}
+
+window.saveCafeProfileSettings = function(e) {
+  if (e) e.preventDefault();
+
+  const nameEl = document.getElementById('restaurantNameInput') || document.querySelector('input[name="restaurantName"]');
+  const taxEl = document.getElementById('taxIdInput') || document.querySelector('input[name="taxId"]');
+  const addrEl = document.getElementById('addressInput') || document.querySelector('textarea[name="address"]') || document.querySelector('input[name="address"]');
+  const phoneEl = document.getElementById('contactNumberInput') || document.querySelector('input[name="contactNumber"]');
+  const currEl = document.getElementById('currencySymbolInput') || document.querySelector('input[name="currencySymbol"]');
+  const footEl = document.getElementById('invoiceFooterInput') || document.querySelector('textarea[name="invoiceFooter"]') || document.querySelector('input[name="invoiceFooter"]');
+
+  const updatedSettings = {
+    restaurantName: nameEl?.value?.trim() || 'Glitch Cafe',
+    taxId: taxEl?.value?.trim() || '',
+    address: addrEl?.value?.trim() || '',
+    contactNumber: phoneEl?.value?.trim() || '',
+    currencySymbol: currEl?.value?.trim() || '₹',
+    invoiceFooter: footEl?.value?.trim() || 'Thank you for visiting! Have a glitch-free day.'
+  };
+
+  // 1. Persist immediately to all potential local storage keys
+  localStorage.setItem('cafe_settings', JSON.stringify(updatedSettings));
+  localStorage.setItem('cafe_profile_settings', JSON.stringify(updatedSettings));
+
+  // 2. Non-blocking backend sync attempt
+  const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
+  const token = localStorage.getItem('glitch_admin_token') || localStorage.getItem('token');
+  
+  fetch(`${apiBase}/settings`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify(updatedSettings)
+  }).catch(() => {});
+
   if (typeof showToast === 'function') {
-    showToast('Cafe settings updated successfully!', 'success');
+    showToast('Profile details saved successfully!', 'success');
+  } else {
+    alert('Profile details saved successfully!');
   }
 };
 

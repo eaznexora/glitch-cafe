@@ -155,31 +155,33 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label class="label-text">Cafe/Restaurant Name</label>
-                <input type="text" class="input-field" value="Glitch Cafe" id="cafe-name">
+                <input type="text" class="input-field" value="Glitch Cafe" id="restaurantNameInput">
               </div>
               <div>
                 <label class="label-text">Tax ID / GSTIN</label>
-                <input type="text" class="input-field" value="22AAAAA0000A1Z5" id="cafe-gst">
+                <input type="text" class="input-field" value="22AAAAA0000A1Z5" id="taxIdInput">
               </div>
               <div class="md:col-span-2">
                 <label class="label-text">Business Address</label>
-                <textarea class="input-field" rows="2" id="cafe-address">123 Web Dev Lane, Tech City, 10001</textarea>
+                <textarea class="input-field" rows="2" id="addressInput">123 Web Dev Lane, Tech City, 10001</textarea>
               </div>
               <div>
                 <label class="label-text">Contact Number</label>
-                <input type="text" class="input-field" value="+91 98765 43210" id="cafe-phone">
+                <input type="text" class="input-field" value="+91 98765 43210" id="contactNumberInput">
               </div>
               <div>
                 <label class="label-text">Currency Symbol</label>
-                <input type="text" class="input-field bg-gray-50" value="₹" readonly>
+                <input type="text" class="input-field bg-gray-50" value="₹" id="currencySymbolInput" readonly>
               </div>
               <div class="md:col-span-2">
                 <label class="label-text">Invoice Footer Note</label>
-                <input type="text" class="input-field" value="Thank you for visiting! Have a glitch-free day." id="cafe-footer">
+                <input type="text" class="input-field" value="Thank you for visiting! Have a glitch-free day." id="invoiceFooterInput">
               </div>
             </div>
             <div class="pt-4 border-t border-gray-100 flex justify-end">
-              <button class="btn-primary" onclick="saveCafeProfile(event)">Save Profile Details</button>
+              <button type="button" onclick="saveCafeProfileSettings(event)" class="bg-black hover:bg-gray-800 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition shadow-sm">
+                Save Profile Details
+              </button>
             </div>
           </div>
         </div>
