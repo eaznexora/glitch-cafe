@@ -242,29 +242,23 @@
     </script>
     <script src="./src/main.js"></script>
     <script>
-      async function loadAndRenderIndexDashboard() {
-        const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
-
+      async function initDashboard() {
         try {
+          const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
           const res = await fetch(`${apiBase}/orders`);
-          if (!res.ok) return;
+          if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+          
           const json = await res.json();
-          const orders = Array.isArray(json) ? json : (json.orders || []);
+          const allOrders = Array.isArray(json) ? json : (json.data || json.orders || []);
+          console.log('[DEBUG] Fetched total orders:', allOrders.length);
 
-          const now = new Date();
-          const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+          const todayStr = new Date().toDateString();
+          const todayOrders = allOrders.filter(o => {
+            const d = new Date(o.createdAt || o.date || o.timestamp || Date.now());
+            return isNaN(d.getTime()) ? true : d.toDateString() === todayStr;
+          });
 
-          // Check if order is from today
-          const isToday = (dateInput) => {
-            if (!dateInput) return true;
-            const d = new Date(dateInput);
-            if (isNaN(d.getTime())) return true;
-            return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-          };
-
-          const todayOrders = orders.filter(o => isToday(o.createdAt || o.date || o.timestamp));
-
-          const normalize = (str) => (str || '').toString().toLowerCase().trim();
+          const normalize = (st) => (st || '').toString().toLowerCase().trim();
 
           // 1. Total Orders
           const totalOrders = todayOrders.length;
@@ -272,27 +266,27 @@
           // 2. Completed Orders
           const completedOrders = todayOrders.filter(o => ['completed', 'served', 'ready to serve', 'ready_to_serve'].includes(normalize(o.status))).length;
 
-          // 3. Cancelled / Rejected Orders
+          // 3. Cancelled Orders
           const cancelledOrders = todayOrders.filter(o => ['rejected', 'cancelled', 'canceled'].includes(normalize(o.status))).length;
 
-          // 4. Non-cancelled orders for Revenue & Avg
+          // 4. Valid Orders for Revenue & Avg Value
           const validOrders = todayOrders.filter(o => !['rejected', 'cancelled', 'canceled'].includes(normalize(o.status)));
           const revenue = validOrders.reduce((sum, o) => sum + (parseFloat(o.total || o.totalAmount || 0) || 0), 0);
-          const avgOrderVal = validOrders.length > 0 ? (revenue / validOrders.length) : 0;
+          const avgVal = validOrders.length > 0 ? (revenue / validOrders.length) : 0;
 
-          // Direct DOM Updates (Using querySelector to handle both IDs and classes)
-          const setElemText = (selector, val) => {
+          // Update Top Cards Safely
+          const setSafe = (selector, val) => {
             const el = document.querySelector(selector);
             if (el) el.innerText = val;
           };
 
-          setElemText('#todayRevenue, [data-kpi="revenue"]', `₹${revenue.toFixed(1)}`);
-          setElemText('#totalOrders, [data-kpi="total-orders"]', totalOrders);
-          setElemText('#completedOrders, #completedOrdersCount, [data-kpi="completed-orders"]', completedOrders);
-          setElemText('#cancelledOrders, #cancelledOrdersCount, [data-kpi="cancelled-orders"]', cancelledOrders);
-          setElemText('#avgOrderValue, [data-kpi="avg-order-value"]', `₹${avgOrderVal.toFixed(1)}`);
+          setSafe('#todayRevenue', `₹${revenue.toFixed(1)}`);
+          setSafe('#totalOrders', totalOrders);
+          setSafe('#completedOrdersCount', completedOrders);
+          setSafe('#cancelledOrdersCount', cancelledOrders);
+          setSafe('#avgOrderValue', `₹${avgVal.toFixed(1)}`);
 
-          // 5. Sales by Category
+          // 5. Render Sales by Category
           const categoryMap = {
             'FRIES': { count: 0, revenue: 0 },
             "MOMO'S": { count: 0, revenue: 0 },
@@ -325,7 +319,7 @@
             });
           });
 
-          const categoryContainer = document.querySelector('#salesByCategoryContainer, .sales-by-category-list, [data-container="sales-category"]');
+          const categoryContainer = document.querySelector('#salesByCategoryContainer, .sales-by-category-list');
           if (categoryContainer) {
             const activeCats = Object.entries(categoryMap).filter(([_, data]) => data.count > 0);
             if (activeCats.length === 0) {
@@ -348,7 +342,7 @@
             }
           }
 
-          // 6. Payment Breakdown (UPI vs Cash)
+          // 6. Payment Breakdown
           let upi = 0, cash = 0;
           validOrders.forEach(o => {
             if ((o.paymentStatus || '').toUpperCase() !== 'PAID') return;
@@ -377,15 +371,15 @@
           }
 
         } catch (err) {
-          console.error('Error loading index.html dashboard analytics:', err);
+          console.error('Fatal Dashboard Init Error:', err);
         }
       }
 
       // Call on load and on real-time socket events
-      document.addEventListener('DOMContentLoaded', loadAndRenderIndexDashboard);
+      document.addEventListener('DOMContentLoaded', initDashboard);
       if (window.socket) {
-        window.socket.on('order:new', loadAndRenderIndexDashboard);
-        window.socket.on('order:status_changed', loadAndRenderIndexDashboard);
+        window.socket.on('order:new', initDashboard);
+        window.socket.on('order:status_changed', initDashboard);
       }
     </script>
   </body>
