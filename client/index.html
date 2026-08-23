@@ -405,14 +405,12 @@
         }
       }
 
-      let salesChartInstance = null;
-
       function renderSalesAnalyticsChart(validOrders, timeframe = 'Today') {
-        const canvas = document.getElementById('salesAnalyticsChart') || document.querySelector('canvas');
+        const canvas = document.getElementById('salesAnalyticsChart') || document.querySelector('#salesChart') || document.querySelector('canvas');
         if (!canvas) return;
 
-        if (salesChartInstance) {
-          salesChartInstance.destroy();
+        if (window.salesChartInstance && typeof window.salesChartInstance.destroy === 'function') {
+          window.salesChartInstance.destroy();
         }
 
         let labels = [];
@@ -456,7 +454,7 @@
         }
 
         const ctx = canvas.getContext('2d');
-        salesChartInstance = new Chart(ctx, {
+        window.salesChartInstance = new Chart(ctx, {
           type: 'line',
           data: {
             labels: labels,
