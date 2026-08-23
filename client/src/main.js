@@ -61,6 +61,7 @@ async function init() {
     await fetchChartData();
   }
   
+  await fetchAllProducts();
   await fetchAllOrders();
   syncKitchenBellState(allOrdersData);
   setupSocketListeners();
@@ -304,6 +305,20 @@ async function fetchAllOrders() {
   }
 }
 
+async function fetchAllProducts() {
+  try {
+    const res = await fetch(`${API_BASE}/products`, { headers: getAuthHeaders() });
+    if (res.ok) {
+      window.allProductsData = await res.json();
+    } else {
+      window.allProductsData = [];
+    }
+  } catch (err) {
+    console.error('Failed to fetch products:', err);
+    window.allProductsData = [];
+  }
+}
+
 window.updateAllUI = function() {
   syncKitchenBellState(allOrdersData);
   
@@ -341,19 +356,45 @@ window.updateAllUI = function() {
     document.querySelector('#kpi-aov').innerText = `₹${avgOrderValue}`;
     document.querySelector('#kpi-revenue').innerText = `₹${todayRevenue.toFixed(2)}`;
 
+    // Build a fast lookup dictionary from products list
+    const productCategoryMap = {};
+    if (Array.isArray(window.allProductsData)) {
+      window.allProductsData.forEach(p => {
+        if (p.name) productCategoryMap[p.name.toLowerCase().trim()] = p.category;
+        if (p._id) productCategoryMap[p._id] = p.category;
+      });
+    }
+
     // Circle 5: Real "Sales by Category" Aggregation
     const categorySales = {}; 
     const salesByCategoryContainer = document.querySelector('#salesByCategoryContainer');
     if (salesByCategoryContainer) {
       validOrders.forEach(order => {
         (order.items || []).forEach(item => {
-          const cat = item.category || item.categoryName || (item.product && item.product.category) || 'General';
+          let resolvedCategory = 
+            item.category || 
+            item.categoryName || 
+            (item.product && item.product.category) ||
+            productCategoryMap[item.name?.toLowerCase()?.trim()] ||
+            productCategoryMap[item.productId] ||
+            'Uncategorized';
+
+          // Skip invalid / empty labels
+          if (resolvedCategory === 'General' || resolvedCategory === 'Uncategorized' || resolvedCategory === 'Other') {
+            // Attempt keyword heuristics if still unmapped
+            const nameLower = (item.name || '').toLowerCase();
+            if (nameLower.includes('fries')) resolvedCategory = 'Fries';
+            else if (nameLower.includes('momo')) resolvedCategory = "Momo's";
+            else if (nameLower.includes('burger')) resolvedCategory = 'Burgers';
+            else if (nameLower.includes('shake') || nameLower.includes('tea') || nameLower.includes('coffee') || nameLower.includes('mojito')) resolvedCategory = 'Beverages';
+          }
+
           const qty = Number(item.quantity || item.qty || 1);
           const price = Number(item.price || (item.product && item.product.price) || 0);
 
-          if (!categorySales[cat]) categorySales[cat] = { count: 0, revenue: 0 };
-          categorySales[cat].count += qty;
-          categorySales[cat].revenue += price * qty;
+          if (!categorySales[resolvedCategory]) categorySales[resolvedCategory] = { count: 0, revenue: 0 };
+          categorySales[resolvedCategory].count += qty;
+          categorySales[resolvedCategory].revenue += price * qty;
         });
       });
 

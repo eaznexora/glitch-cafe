@@ -260,7 +260,18 @@ async function submitOrderPayload(customer) {
     table: cleanTable,
     customerName: customer.name,
     customerEmail: customer.email,
-    items: cart,
+    items: cart.map(item => ({
+      productId: item.id || item._id,
+      menuItemId: item.id || item._id,
+      name: item.name,
+      category: item.category || item.categoryName || 'Other',
+      price: Number(item.price),
+      quantity: Number(item.quantity || 1),
+      size: item.size,
+      toppings: item.toppings,
+      notes: item.notes,
+      subtotal: item.subtotal
+    })),
     totalAmount,
     note
   };

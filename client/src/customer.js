@@ -564,6 +564,7 @@ window.addToOrder = () => {
     cart.push({
       id: item._id,
       name: item.name,
+      category: item.category || item.categoryName || 'Other',
       isGlitchSpecial: Boolean(item.isSpecial || item.isGlitchSpecial || item.special),
       isSpecial: Boolean(item.isSpecial || item.isGlitchSpecial || item.special),
       size: sizeName,

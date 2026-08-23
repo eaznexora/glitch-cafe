@@ -8,7 +8,9 @@ const orderSchema = new mongoose.Schema({
   orderNumber: { type: String, required: true, unique: true },
   items: [{
     menuItemId: { type: String },
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
     name: { type: String, required: true },
+    category: { type: String, default: 'Other' },
     price: { type: Number, required: true },
     quantity: { type: Number, required: true, min: 1 },
     size: { type: String },
