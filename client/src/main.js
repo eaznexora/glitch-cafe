@@ -744,7 +744,7 @@ window.openOrderDrawer = (orderId) => {
   `;
 
   let actionsHtml = `
-    <button id="printReceiptBtn" onclick="window.printOrderReceipt()" class="w-full py-2.5 bg-black hover:bg-gray-800 text-white font-medium rounded-lg text-sm flex items-center justify-center gap-2 transition">
+    <button type="button" id="printReceiptBtn" onclick="window.generateReceiptPDF()" class="w-full py-2.5 bg-black hover:bg-gray-800 text-white font-medium rounded-lg text-sm flex items-center justify-center gap-2 transition cursor-pointer">
       🖨️ Print Receipt
     </button>
     <div id="paymentActionContainer" class="w-full mt-3">
@@ -1403,29 +1403,45 @@ window.confirmPayment = async function(method) {
   }
 };
 
-window.printOrderReceipt = async function(orderId) {
-  const targetId = orderId || window.currentSelectedOrderId;
-  if (!targetId) {
-    if (typeof showToast === 'function') showToast('No order selected for receipt generation', 'error');
+// Remove old legacy function if defined
+window.printReceipt = undefined;
+
+window.generateReceiptPDF = async function() {
+  const orderId = window.currentSelectedOrderId;
+  if (!orderId) {
+    if (typeof showToast === 'function') showToast('Please select an order first', 'error');
     return;
+  }
+
+  // Ensure jsPDF is loaded
+  if (!window.jspdf) {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    document.head.appendChild(script);
+    await new Promise((resolve) => (script.onload = resolve));
   }
 
   const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
   const token = localStorage.getItem('glitch_admin_token') || localStorage.getItem('token');
 
   try {
-    // 1. Fetch Order Details & Cafe Settings in parallel
+    // 1. Fetch Order & Settings
     const [orderRes, settingsRes] = await Promise.all([
-      fetch(`${apiBase}/orders/${targetId}`, { headers: token ? { 'Authorization': `Bearer ${token}` } : {} }),
-      fetch(`${apiBase}/settings/profile`, { headers: token ? { 'Authorization': `Bearer ${token}` } : {} }).catch(() => null)
+      fetch(`${apiBase}/orders/${orderId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      }).catch(() => null),
+      fetch(`${apiBase}/settings/profile`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      }).catch(() => null)
     ]);
 
     let order = null;
-    if (orderRes.ok) {
-      const orderJson = await orderRes.json();
-      order = orderJson.data || orderJson.order || orderJson;
-    } else {
-      order = (window.allOrdersData || []).find(o => (o._id || o.id || o.orderNumber) === targetId);
+    if (orderRes && orderRes.ok) {
+      const oJson = await orderRes.json();
+      order = oJson.data || oJson.order || oJson;
+    }
+    if (!order) {
+      order = (window.allOrdersData || []).find(o => (o._id || o.id || o.orderNumber) === orderId);
     }
 
     if (!order) {
@@ -1433,12 +1449,12 @@ window.printOrderReceipt = async function(orderId) {
       return;
     }
 
+    // Dynamic settings from Admin Profile
     let settings = {
       restaurantName: 'Glitch Cafe',
       address: '123 Web Dev Lane, Tech City, 10001',
       contactNumber: '+91 98765 43210',
       taxId: '22AAAAA0000A1Z5',
-      currencySymbol: '₹',
       invoiceFooter: 'THANK YOU. VISIT AGAIN.\nTHANK YOU'
     };
 
@@ -1446,157 +1462,150 @@ window.printOrderReceipt = async function(orderId) {
       const sJson = await settingsRes.json();
       const sData = sJson.data || sJson.settings || sJson;
       if (sData) {
-        settings = {
-          restaurantName: sData.restaurantName || sData.name || settings.restaurantName,
-          address: sData.address || settings.address,
-          contactNumber: sData.contactNumber || sData.phone || settings.contactNumber,
-          taxId: sData.taxId || sData.gstin || settings.taxId,
-          currencySymbol: sData.currencySymbol || settings.currencySymbol,
-          invoiceFooter: sData.invoiceFooterNote || sData.invoiceFooter || settings.invoiceFooter
-        };
+        if (sData.restaurantName || sData.name) settings.restaurantName = sData.restaurantName || sData.name;
+        if (sData.address) settings.address = sData.address;
+        if (sData.contactNumber || sData.phone) settings.contactNumber = sData.contactNumber || sData.phone;
+        if (sData.taxId || sData.gstin) settings.taxId = sData.taxId || sData.gstin;
+        if (sData.invoiceFooterNote || sData.invoiceFooter) settings.invoiceFooter = sData.invoiceFooterNote || sData.invoiceFooter;
       }
     }
 
-    // 2. Initialize jsPDF in 80mm POS Thermal Receipt Format
+    // 2. Generate 80mm Thermal jsPDF Document
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: [80, 220] // standard 80mm thermal receipt roll dimensions
+      format: [80, 240]
     });
 
-    let y = 10;
+    let y = 8;
     const leftX = 5;
     const rightX = 75;
     const centerX = 40;
 
-    // Header: Restaurant Name & Address
+    // Cafe Title
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
+    doc.setFontSize(13);
     doc.text(settings.restaurantName, centerX, y, { align: 'center' });
     y += 5;
 
+    // Address
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
-    const splitAddress = doc.splitTextToSize(settings.address, 68);
-    doc.text(splitAddress, centerX, y, { align: 'center' });
-    y += splitAddress.length * 3.8;
+    doc.setFontSize(8);
+    const splitAddr = doc.splitTextToSize(settings.address, 68);
+    doc.text(splitAddr, centerX, y, { align: 'center' });
+    y += (splitAddr.length * 3.5) + 1;
 
+    // Contact & GSTIN
     if (settings.contactNumber) {
       doc.text(`CONTACT NO: ${settings.contactNumber}`, centerX, y, { align: 'center' });
-      y += 4;
+      y += 3.5;
     }
     if (settings.taxId) {
       doc.text(`GSTIN: ${settings.taxId}`, centerX, y, { align: 'center' });
-      y += 4;
+      y += 3.5;
     }
 
     // Divider
-    y += 1;
-    doc.setDrawColor(200, 200, 200);
+    doc.setDrawColor(180, 180, 180);
     doc.line(leftX, y, rightX, y);
     y += 4;
 
-    // Date, Time & Table Info
+    // Date, Time, Table
     const orderDate = new Date(order.createdAt || order.date || Date.now());
-    const dateStr = orderDate.toLocaleDateString('en-GB'); // DD/MM/YYYY
+    const dateStr = orderDate.toLocaleDateString('en-GB');
     const timeStr = orderDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-    const tableStr = order.table ? (order.table.startsWith('Table') ? order.table : `Table: ${order.table}`) : 'Table 1';
+    const tableStr = order.table ? (order.table.toString().startsWith('Table') ? order.table : `Table: ${order.table}`) : 'Table 1';
 
     doc.setFontSize(8);
     doc.text(`Date: ${dateStr}`, leftX, y);
-    doc.text(`Time: ${timeStr}`, centerX - 5, y);
+    doc.text(`Time: ${timeStr}`, centerX - 4, y);
     doc.text(tableStr, rightX, y, { align: 'right' });
     y += 4;
 
     doc.line(leftX, y, rightX, y);
-    y += 4.5;
+    y += 4;
 
-    // Invoice Meta (Receipt No, Customer, Payment Mode)
-    const invoiceNo = order.orderNumber || `INV-${orderDate.getFullYear()}-${(order._id || '0000').slice(-4).toUpperCase()}`;
-    const customerName = order.customerName || order.customer || 'Walk-in Guest';
-    const paymentMode = (order.paymentMethod || order.paymentMode || (order.paymentStatus === 'PAID' ? 'CASH' : 'UNPAID')).toLowerCase();
+    // Receipt Meta
+    const invNo = order.orderNumber || `ORD-${(order._id || '0000').slice(-4)}`;
+    const custName = order.customerName || order.customer || 'Guest';
+    const payMode = (order.paymentMethod || order.paymentMode || (order.paymentStatus === 'PAID' ? 'CASH' : 'UNPAID')).toUpperCase();
 
     doc.setFont('helvetica', 'bold');
     doc.text('RECEIPT NO -', leftX, y);
     doc.setFont('helvetica', 'normal');
-    doc.text(invoiceNo, rightX, y, { align: 'right' });
+    doc.text(invNo, rightX, y, { align: 'right' });
     y += 4;
 
     doc.setFont('helvetica', 'bold');
     doc.text('CUSTOMER -', leftX, y);
     doc.setFont('helvetica', 'normal');
-    doc.text(customerName, rightX, y, { align: 'right' });
+    doc.text(custName, rightX, y, { align: 'right' });
     y += 4;
 
     doc.setFont('helvetica', 'bold');
     doc.text('PAYMENT MODE -', leftX, y);
     doc.setFont('helvetica', 'normal');
-    doc.text(paymentMode, rightX, y, { align: 'right' });
+    doc.text(payMode, rightX, y, { align: 'right' });
     y += 5;
 
-    // Items Section
+    // Order Items
     const items = Array.isArray(order.items) ? order.items : [];
     items.forEach(item => {
       const qty = item.quantity || item.qty || 1;
       const price = parseFloat(item.price || 0) * qty;
-      const itemName = `${qty} x ${item.name}`;
+      const itemLabel = `${qty} x ${item.name}`;
 
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
-      
-      const splitName = doc.splitTextToSize(itemName, 48);
-      doc.text(splitName, leftX, y);
+      doc.setFontSize(8);
+      const splitItem = doc.splitTextToSize(itemLabel, 48);
+      doc.text(splitItem, leftX, y);
       doc.text(`Rs. ${price.toFixed(2)}`, rightX, y, { align: 'right' });
-      y += Math.max(splitName.length * 4, 4.5);
+      y += Math.max(splitItem.length * 3.5, 4.2);
     });
 
     // Divider
-    y += 1;
     doc.line(leftX, y, rightX, y);
-    y += 4.5;
+    y += 4;
 
-    // Calculations
+    // Totals
     const subtotal = items.reduce((sum, i) => sum + (parseFloat(i.price || 0) * (i.quantity || 1)), 0);
     const taxes = parseFloat(order.tax || order.taxes || 0);
-    const grandTotal = parseFloat(order.total || order.totalAmount || (subtotal + taxes));
+    const total = parseFloat(order.total || order.totalAmount || (subtotal + taxes));
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
+    doc.setFontSize(8);
     doc.text('SUBTOTAL:', leftX, y);
     doc.text(`Rs. ${subtotal.toFixed(2)}`, rightX, y, { align: 'right' });
-    y += 4;
+    y += 3.5;
 
     if (taxes > 0) {
       doc.text('CGST (2.5%):', leftX, y);
       doc.text(`Rs. ${(taxes / 2).toFixed(2)}`, rightX, y, { align: 'right' });
-      y += 4;
+      y += 3.5;
       doc.text('SGST (2.5%):', leftX, y);
       doc.text(`Rs. ${(taxes / 2).toFixed(2)}`, rightX, y, { align: 'right' });
-      y += 4;
+      y += 3.5;
     }
 
-    doc.setFontSize(10);
+    doc.setFontSize(9.5);
     doc.text('TOTAL:', leftX, y);
-    doc.text(`Rs. ${grandTotal.toFixed(2)}`, rightX, y, { align: 'right' });
+    doc.text(`Rs. ${total.toFixed(2)}`, rightX, y, { align: 'right' });
     y += 6;
 
     // Footer
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    const footerLines = doc.splitTextToSize(settings.invoiceFooter, 68);
-    doc.text(footerLines, centerX, y, { align: 'center' });
+    doc.setFontSize(7.5);
+    const splitFooter = doc.splitTextToSize(settings.invoiceFooter, 68);
+    doc.text(splitFooter, centerX, y, { align: 'center' });
 
-    // 3. Open PDF in print preview / save as blob
-    doc.autoPrint();
-    const pdfBlobUrl = doc.output('bloburl');
-    window.open(pdfBlobUrl, '_blank');
+    // Output & Open
+    const pdfBlob = doc.output('blob');
+    const blobUrl = URL.createObjectURL(pdfBlob);
+    window.open(blobUrl, '_blank');
 
-    if (typeof showToast === 'function') {
-      showToast('Receipt PDF generated successfully!', 'success');
-    }
   } catch (err) {
-    console.error('PDF Receipt Generation Error:', err);
-    if (typeof showToast === 'function') showToast('Failed to generate PDF receipt', 'error');
+    console.error('Failed to generate receipt PDF:', err);
+    if (typeof showToast === 'function') showToast('Error generating PDF receipt', 'error');
   }
 };
