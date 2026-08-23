@@ -1407,8 +1407,8 @@ window.confirmPayment = async function(method) {
 // Remove old legacy function if defined
 window.printReceipt = undefined;
 
-window.generateReceiptPDF = function() {
-  // 1. Retrieve Active Order from memory
+window.generateReceiptPDF = async function() {
+  // 1. Resolve Active Order
   let order = window.currentActiveOrder;
   if (!order && window.currentSelectedOrderId) {
     order = (window.allOrdersData || []).find(o => (o._id || o.id || o.orderNumber) === window.currentSelectedOrderId);
@@ -1419,7 +1419,7 @@ window.generateReceiptPDF = function() {
     return;
   }
 
-  // 2. Retrieve Settings from localStorage or defaults
+  // 2. Fetch Settings from localStorage or defaults
   let settings = {
     restaurantName: 'Glitch Cafe',
     address: '123 Web Dev Lane, Tech City, 10001',
@@ -1437,7 +1437,7 @@ window.generateReceiptPDF = function() {
     } catch (e) {}
   }
 
-  // 3. Format Date, Time & Meta
+  // 3. Format Details
   const orderDate = new Date(order.createdAt || order.date || Date.now());
   const dateStr = orderDate.toLocaleDateString('en-GB');
   const timeStr = orderDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -1455,128 +1455,130 @@ window.generateReceiptPDF = function() {
     const qty = item.quantity || item.qty || 1;
     const price = (parseFloat(item.price || 0) * qty).toFixed(2);
     return `
-      <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 13px;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px;">
         <span style="max-width: 65%; word-break: break-word;">${qty} x ${item.name}</span>
         <span style="font-weight: 600;">₹${price}</span>
       </div>
     `;
   }).join('');
 
-  // 4. Construct Thermal Receipt HTML Template
-  const receiptHtml = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Receipt - ${invoiceNo}</title>
-      <style>
-        @page {
-          size: 80mm auto;
-          margin: 0;
-        }
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-          width: 76mm;
-          margin: 0 auto;
-          padding: 12px 6px;
-          color: #000;
-          font-size: 12px;
-          line-height: 1.35;
-        }
-        .text-center { text-align: center; }
-        .text-right { text-align: right; }
-        .bold { font-weight: bold; }
-        .divider { border-top: 1px dashed #999; margin: 8px 0; }
-        .divider-solid { border-top: 1px solid #000; margin: 8px 0; }
-        .flex-between { display: flex; justify-content: space-between; margin-bottom: 4px; }
-        .header-title { font-size: 18px; font-weight: 800; margin-bottom: 4px; text-transform: uppercase; }
-        .footer { font-size: 11px; margin-top: 10px; white-space: pre-line; }
-      </style>
-    </head>
-    <body>
-      <div class="text-center">
-        <div class="header-title">${settings.restaurantName}</div>
-        <div>${settings.address}</div>
-        ${settings.contactNumber ? `<div>CONTACT NO: ${settings.contactNumber}</div>` : ''}
-        ${settings.taxId ? `<div>GSTIN: ${settings.taxId}</div>` : ''}
+  // 4. Construct Thermal Receipt HTML Content
+  const receiptBody = `
+    <div id="thermalReceiptContent" style="width: 76mm; margin: 0 auto; padding: 14px 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #000; font-size: 12px; line-height: 1.35; background: #fff;">
+      <div style="text-align: center;">
+        <div style="font-size: 18px; font-weight: 800; text-transform: uppercase; margin-bottom: 4px;">${settings.restaurantName}</div>
+        <div style="font-size: 11px;">${settings.address}</div>
+        ${settings.contactNumber ? `<div style="font-size: 11px;">CONTACT NO: ${settings.contactNumber}</div>` : ''}
+        ${settings.taxId ? `<div style="font-size: 11px;">GSTIN: ${settings.taxId}</div>` : ''}
       </div>
 
-      <div class="divider"></div>
+      <div style="border-top: 1px dashed #777; margin: 8px 0;"></div>
 
-      <div class="flex-between" style="font-size: 11px;">
+      <div style="display: flex; justify-content: space-between; font-size: 11px;">
         <span>Date: ${dateStr}</span>
         <span>Time: ${timeStr}</span>
         <span>${tableStr}</span>
       </div>
 
-      <div class="divider"></div>
+      <div style="border-top: 1px dashed #777; margin: 8px 0;"></div>
 
-      <div class="flex-between">
-        <span class="bold">RECEIPT NO -</span>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+        <span style="font-weight: bold;">RECEIPT NO -</span>
         <span>${invoiceNo}</span>
       </div>
-      <div class="flex-between">
-        <span class="bold">CUSTOMER -</span>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+        <span style="font-weight: bold;">CUSTOMER -</span>
         <span>${customerName}</span>
       </div>
-      <div class="flex-between">
-        <span class="bold">PAYMENT MODE -</span>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+        <span style="font-weight: bold;">PAYMENT MODE -</span>
         <span style="text-transform: capitalize;">${paymentMode}</span>
       </div>
 
-      <div class="divider"></div>
+      <div style="border-top: 1px dashed #777; margin: 8px 0;"></div>
 
-      <div>
-        ${itemsHtml}
-      </div>
+      <div>${itemsHtml}</div>
 
-      <div class="divider"></div>
+      <div style="border-top: 1px dashed #777; margin: 8px 0;"></div>
 
-      <div class="flex-between">
-        <span class="bold">SUBTOTAL:</span>
-        <span class="bold">₹${subtotal.toFixed(2)}</span>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+        <span style="font-weight: bold;">SUBTOTAL:</span>
+        <span style="font-weight: bold;">₹${subtotal.toFixed(2)}</span>
       </div>
       ${taxes > 0 ? `
-      <div class="flex-between">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
         <span>CGST (2.5%):</span>
         <span>₹${(taxes / 2).toFixed(2)}</span>
       </div>
-      <div class="flex-between">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
         <span>SGST (2.5%):</span>
         <span>₹${(taxes / 2).toFixed(2)}</span>
       </div>` : ''}
 
-      <div class="flex-between" style="font-size: 15px; margin-top: 4px;">
-        <span class="bold">TOTAL:</span>
-        <span class="bold">₹${grandTotal.toFixed(2)}</span>
+      <div style="display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; margin-top: 4px;">
+        <span>TOTAL:</span>
+        <span>₹${grandTotal.toFixed(2)}</span>
       </div>
 
-      <div class="divider-solid"></div>
+      <div style="border-top: 1px solid #000; margin: 10px 0 8px 0;"></div>
 
-      <div class="text-center footer">
+      <div style="text-align: center; font-size: 11px; white-space: pre-line;">
         ${settings.invoiceFooter}
+      </div>
+    </div>
+  `;
+
+  // 5. Action 1: Open the receipt in a new tab immediately
+  const fullHtmlPage = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Receipt - ${invoiceNo}</title>
+      <style>
+        body { margin: 0; padding: 20px; background: #f3f4f6; display: flex; justify-content: center; }
+      </style>
+    </head>
+    <body>
+      <div style="box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden;">
+        ${receiptBody}
       </div>
     </body>
     </html>
   `;
+  const receiptBlob = new Blob([fullHtmlPage], { type: 'text/html' });
+  const tabUrl = URL.createObjectURL(receiptBlob);
+  window.open(tabUrl, '_blank');
 
-  // 5. Open in dedicated print frame (Never blocked by popup blockers)
-  let printFrame = document.getElementById('receiptPrintFrame');
-  if (!printFrame) {
-    printFrame = document.createElement('iframe');
-    printFrame.id = 'receiptPrintFrame';
-    printFrame.style.position = 'fixed';
-    printFrame.style.top = '-9999px';
-    printFrame.style.left = '-9999px';
-    document.body.appendChild(printFrame);
+  // 6. Action 2: Trigger automatic PDF download via html2pdf
+  const tempContainer = document.createElement('div');
+  tempContainer.style.position = 'fixed';
+  tempContainer.style.left = '-9999px';
+  tempContainer.innerHTML = receiptBody;
+  document.body.appendChild(tempContainer);
+
+  const opt = {
+    margin: [5, 2, 5, 2],
+    filename: `Receipt-${invoiceNo}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: [80, 240], orientation: 'portrait' }
+  };
+
+  if (window.html2pdf) {
+    window.html2pdf().set(opt).from(tempContainer.querySelector('#thermalReceiptContent')).save().then(() => {
+      document.body.removeChild(tempContainer);
+      if (typeof showToast === 'function') showToast(`Receipt ${invoiceNo}.pdf downloaded!`, 'success');
+    });
+  } else {
+    // Dynamic script fallback if html2pdf wasn't preloaded
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+    script.onload = () => {
+      window.html2pdf().set(opt).from(tempContainer.querySelector('#thermalReceiptContent')).save().then(() => {
+        document.body.removeChild(tempContainer);
+        if (typeof showToast === 'function') showToast(`Receipt ${invoiceNo}.pdf downloaded!`, 'success');
+      });
+    };
+    document.head.appendChild(script);
   }
-
-  const frameDoc = printFrame.contentWindow || printFrame.contentDocument.document || printFrame.contentDocument;
-  frameDoc.document.open();
-  frameDoc.document.write(receiptHtml);
-  frameDoc.document.close();
-
-  setTimeout(() => {
-    printFrame.contentWindow.focus();
-    printFrame.contentWindow.print();
-  }, 250);
 };
