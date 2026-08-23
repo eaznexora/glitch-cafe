@@ -123,7 +123,7 @@
             <p class="text-3xl font-bold text-monochrome-900" id="kpi-tables">0 / 0</p>
           </div>
           <div class="card transform transition-transform hover:-translate-y-1">
-            <h3 class="text-sm font-medium text-gray-500 mb-1">Pending Tickets</h3>
+            <h3 class="text-sm font-medium text-gray-500 mb-1" id="cancelledOrdersLabel">Cancelled Orders</h3>
             <p class="text-3xl font-bold text-monochrome-900" id="kpi-pending">0</p>
           </div>
           <div class="card transform transition-transform hover:-translate-y-1">
@@ -178,55 +178,8 @@
           <div class="space-y-8">
             <div class="card">
               <h2 class="text-lg font-bold text-monochrome-900 mb-6">Sales by Category</h2>
-              <div class="space-y-4">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center">
-                    <div class="w-8 h-8 rounded bg-gray-100 flex items-center justify-center mr-3">
-                      <i data-lucide="coffee" class="h-4 w-4 text-gray-600"></i>
-                    </div>
-                    <div>
-                      <p class="text-sm font-medium text-monochrome-900">Beverages</p>
-                      <p class="text-xs text-gray-500">45 items</p>
-                    </div>
-                  </div>
-                  <span class="text-sm font-bold">₹8,400</span>
-                </div>
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center">
-                    <div class="w-8 h-8 rounded bg-gray-100 flex items-center justify-center mr-3">
-                      <i data-lucide="pizza" class="h-4 w-4 text-gray-600"></i>
-                    </div>
-                    <div>
-                      <p class="text-sm font-medium text-monochrome-900">Mains</p>
-                      <p class="text-xs text-gray-500">32 items</p>
-                    </div>
-                  </div>
-                  <span class="text-sm font-bold">₹14,200</span>
-                </div>
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center">
-                    <div class="w-8 h-8 rounded bg-gray-100 flex items-center justify-center mr-3">
-                      <i data-lucide="croissant" class="h-4 w-4 text-gray-600"></i>
-                    </div>
-                    <div>
-                      <p class="text-sm font-medium text-monochrome-900">Desserts</p>
-                      <p class="text-xs text-gray-500">18 items</p>
-                    </div>
-                  </div>
-                  <span class="text-sm font-bold">₹4,500</span>
-                </div>
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center">
-                    <div class="w-8 h-8 rounded bg-gray-100 flex items-center justify-center mr-3">
-                      <i data-lucide="utensils-crossed" class="h-4 w-4 text-gray-600"></i>
-                    </div>
-                    <div>
-                      <p class="text-sm font-medium text-monochrome-900">Starters</p>
-                      <p class="text-xs text-gray-500">24 items</p>
-                    </div>
-                  </div>
-                  <span class="text-sm font-bold">₹6,800</span>
-                </div>
+              <div class="space-y-4" id="salesByCategoryContainer">
+                <!-- Dynamically injected -->
               </div>
             </div>
 
@@ -236,28 +189,19 @@
                 <div class="flex flex-col">
                   <div class="flex justify-between text-sm mb-1">
                     <span class="font-medium text-gray-700">UPI</span>
-                    <span class="font-bold">65%</span>
+                    <span class="font-bold" id="upiPercent">0%</span>
                   </div>
                   <div class="w-full bg-gray-200 rounded-full h-2">
-                    <div class="bg-monochrome-900 h-2 rounded-full" style="width: 65%"></div>
-                  </div>
-                </div>
-                <div class="flex flex-col">
-                  <div class="flex justify-between text-sm mb-1">
-                    <span class="font-medium text-gray-700">Card</span>
-                    <span class="font-bold">20%</span>
-                  </div>
-                  <div class="w-full bg-gray-200 rounded-full h-2">
-                    <div class="bg-monochrome-800 h-2 rounded-full" style="width: 20%"></div>
+                    <div class="bg-monochrome-900 h-2 rounded-full transition-all duration-500" id="upiBar" style="width: 0%"></div>
                   </div>
                 </div>
                 <div class="flex flex-col">
                   <div class="flex justify-between text-sm mb-1">
                     <span class="font-medium text-gray-700">Cash</span>
-                    <span class="font-bold">15%</span>
+                    <span class="font-bold" id="cashPercent">0%</span>
                   </div>
                   <div class="w-full bg-gray-200 rounded-full h-2">
-                    <div class="bg-gray-400 h-2 rounded-full" style="width: 15%"></div>
+                    <div class="bg-gray-400 h-2 rounded-full transition-all duration-500" id="cashBar" style="width: 0%"></div>
                   </div>
                 </div>
               </div>

@@ -241,6 +241,98 @@ async function fetchAllOrders() {
 window.updateAllUI = function() {
   syncKitchenBellState(allOrdersData);
   
+  const isDashboard = document.getElementById('kpi-revenue');
+  if (isDashboard) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const todayOrders = allOrdersData.filter(order => {
+      const orderDate = new Date(order.createdAt || order.date || Date.now());
+      return orderDate >= today;
+    });
+
+    // Circle 1: Today's Total Orders
+    const totalTodayOrdersCount = todayOrders.length;
+    document.querySelector('#kpi-orders').innerText = totalTodayOrdersCount;
+
+    // Circle 2: Active Tables (Tables with pending/preparing/ongoing orders)
+    const activeOngoingOrders = allOrdersData.filter(o => ['PENDING', 'PREPARING', 'READY_TO_SERVE', 'ACCEPTED'].includes(o.status));
+    const occupiedTables = new Set(activeOngoingOrders.map(o => String(o.table || o.tableNumber))).size;
+    const totalTablesConfigured = window.TOTAL_TABLES_COUNT || 10;
+    document.querySelector('#kpi-tables').innerText = `${occupiedTables} / ${totalTablesConfigured}`;
+
+    // Circle 3: Cancelled / Rejected Orders (Today)
+    const cancelledTodayOrders = todayOrders.filter(o => ['REJECTED', 'CANCELLED'].includes(o.status)).length;
+    const cancelledLabel = document.querySelector('#cancelledOrdersLabel');
+    if (cancelledLabel) cancelledLabel.innerText = 'Cancelled Orders';
+    document.querySelector('#kpi-pending').innerText = cancelledTodayOrders;
+
+    // Circle 4: Avg Order Value (Today)
+    const todayRevenue = todayOrders
+      .filter(o => o.status !== 'REJECTED' && o.status !== 'CANCELLED')
+      .reduce((sum, o) => sum + Number(o.totalAmount || o.total || 0), 0);
+
+    const validOrdersCount = todayOrders.filter(o => o.status !== 'REJECTED' && o.status !== 'CANCELLED').length;
+    const avgOrderValue = validOrdersCount > 0 ? (todayRevenue / validOrdersCount).toFixed(2) : '0.00';
+    document.querySelector('#kpi-aov').innerText = `₹${avgOrderValue}`;
+    document.querySelector('#kpi-revenue').innerText = `₹${todayRevenue.toLocaleString()}`;
+
+    // Circle 5: Real "Sales by Category" Aggregation
+    const categorySales = {}; 
+    const salesByCategoryContainer = document.querySelector('#salesByCategoryContainer');
+    if (salesByCategoryContainer) {
+      todayOrders.forEach(order => {
+        if (order.status === 'REJECTED' || order.status === 'CANCELLED') return;
+        (order.items || []).forEach(item => {
+          const cat = item.category || item.product?.category || 'General';
+          if (!categorySales[cat]) categorySales[cat] = { count: 0, revenue: 0 };
+          categorySales[cat].count += Number(item.quantity || 1);
+          categorySales[cat].revenue += Number(item.price || 0) * Number(item.quantity || 1);
+        });
+      });
+
+      salesByCategoryContainer.innerHTML = Object.keys(categorySales)
+        .sort((a, b) => categorySales[b].revenue - categorySales[a].revenue)
+        .map(cat => `
+          <div class="flex items-center justify-between">
+            <div class="flex items-center">
+              <div class="w-8 h-8 rounded bg-gray-100 flex items-center justify-center mr-3">
+                <i data-lucide="tag" class="h-4 w-4 text-gray-600"></i>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-monochrome-900">${cat}</p>
+                <p class="text-xs text-gray-500">${categorySales[cat].count} items</p>
+              </div>
+            </div>
+            <span class="text-sm font-bold">₹${categorySales[cat].revenue.toLocaleString()}</span>
+          </div>
+        `).join('') || '<p class="text-sm text-gray-500">No sales today.</p>';
+      
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    // Payment Breakdown
+    let upiTotal = 0;
+    let cashTotal = 0;
+
+    todayOrders.forEach(o => {
+      if (o.status === 'REJECTED' || o.status === 'CANCELLED' || o.paymentStatus !== 'PAID') return;
+      const mode = (o.paymentMethod || o.paymentMode || 'UPI').toUpperCase();
+      const amount = Number(o.totalAmount || o.total || 0);
+      if (mode === 'CASH') cashTotal += amount;
+      else upiTotal += amount;
+    });
+
+    const totalPaid = upiTotal + cashTotal || 1;
+    const upiPercent = Math.round((upiTotal / totalPaid) * 100);
+    const cashPercent = 100 - upiPercent;
+
+    if (document.querySelector('#upiBar')) document.querySelector('#upiBar').style.width = `${upiPercent}%`;
+    if (document.querySelector('#upiPercent')) document.querySelector('#upiPercent').innerText = `${upiPercent}%`;
+    if (document.querySelector('#cashBar')) document.querySelector('#cashBar').style.width = `${cashPercent}%`;
+    if (document.querySelector('#cashPercent')) document.querySelector('#cashPercent').innerText = `${cashPercent}%`;
+  }
+  
   const liveOrdersBody = document.getElementById('live-orders-body');
   if (liveOrdersBody) {
     const liveOrders = allOrdersData.filter(o => !['COMPLETED', 'REJECTED'].includes(o.status));
