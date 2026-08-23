@@ -1,7 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
+  if (typeof window.resolveAndPersistTable === 'function') {
+    window.resolveAndPersistTable();
+  }
   loadAndRenderActiveOrder();
 });
-
 let activeOrderSession = null;
 let pollInterval = null;
 

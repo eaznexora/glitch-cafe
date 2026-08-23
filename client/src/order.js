@@ -62,7 +62,7 @@ async function fetchProducts() {
 
 function initURLParams() {
   // Extract table from URL or token
-  const table = window.getTableNumber();
+  const table = window.resolveAndPersistTable();
   if (table) {
     tableNumber = table;
   }
@@ -252,7 +252,7 @@ async function submitOrderPayload(customer) {
 
   const totalAmount = cart.reduce((sum, item) => sum + item.subtotal, 0);
 
-  const tableId = window.getTableNumber() || sessionStorage.getItem('glitch_table_id') || localStorage.getItem('glitch_table_num') || 'Takeaway';
+  const tableId = window.resolveAndPersistTable();
   const cleanTable = String(tableId).replace(/^Table\s*/i, '');
 
   const payload = {

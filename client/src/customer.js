@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function initURLParams() {
   // Extract table from URL
-  const table = window.getTableNumber();
+  const table = window.resolveAndPersistTable();
   if (table) {
     currentTable = table;
   }

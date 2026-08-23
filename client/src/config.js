@@ -3,32 +3,29 @@ const isSubpath = window.location.pathname.startsWith('/THE-GLITCH-CAFE');
 window.BASE_PATH = isSubpath ? '/THE-GLITCH-CAFE' : '';
 window.API_BASE = isSubpath ? '/THE-GLITCH-CAFE/api' : '/api';
 
-window.getTableNumber = function() {
-  const params = new URLSearchParams(window.location.search);
-  
-  const token = params.get('token');
+window.resolveAndPersistTable = function() {
+  const urlParams = new URLSearchParams(window.location.search);
+  let tableFromUrl = urlParams.get('table');
+
+  // 1. Check for tokenized parameter
+  const token = urlParams.get('token');
   if (token) {
     try {
       const decoded = JSON.parse(atob(token));
-      if (decoded.table || decoded.tableNumber || decoded.id) {
-        const t = decoded.table || decoded.tableNumber || decoded.id;
-        localStorage.setItem('glitch_table_num', t);
-        sessionStorage.setItem('glitch_table_id', t);
-        sessionStorage.setItem('glitch_table', `Table ${t}`);
-        return t;
-      }
+      tableFromUrl = decoded.table || decoded.tableNumber || decoded.id;
     } catch (err) {
-      console.warn("Invalid table token", err);
+      console.error('Failed to parse table token:', err);
     }
   }
 
-  const legacyTable = params.get('table');
-  if (legacyTable) {
-    localStorage.setItem('glitch_table_num', legacyTable);
-    sessionStorage.setItem('glitch_table_id', legacyTable);
-    sessionStorage.setItem('glitch_table', `Table ${legacyTable}`);
-    return legacyTable;
+  // 2. CRITICAL: If a table is found in the current URL, ALWAYS overwrite storage
+  if (tableFromUrl) {
+    const cleanTable = String(tableFromUrl).replace(/^Table\s*/i, '').trim();
+    localStorage.setItem('glitch_active_table', cleanTable);
+    sessionStorage.setItem('glitch_active_table', cleanTable);
+    return cleanTable;
   }
-  
-  return sessionStorage.getItem('glitch_table_id') || localStorage.getItem('glitch_table_num') || 'Takeaway';
+
+  // 3. Fallback to cached storage ONLY if no URL param exists
+  return localStorage.getItem('glitch_active_table') || sessionStorage.getItem('glitch_active_table') || '1';
 };

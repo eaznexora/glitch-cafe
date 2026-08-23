@@ -122,8 +122,18 @@ function playKitchenChime() {
   const isMuted = localStorage.getItem('glitch_sound_enabled') === 'false';
   if (isMuted) return;
 
-  if (audioUnlocked) {
-    bellAudio.play().catch(e => console.warn('Playback error:', e));
+  // Reset and play immediately
+  try {
+    bellAudio.pause();
+    bellAudio.currentTime = 0;
+    const playPromise = bellAudio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(err => {
+        console.warn('Direct bell audio trigger requires user unlock:', err);
+      });
+    }
+  } catch (e) {
+    console.error('Audio playback error:', e);
   }
 }
 
@@ -907,6 +917,9 @@ function setupSocketListeners() {
 
     console.log('⚡ Inserting & Rendering new incoming order:', orderId);
 
+    // 4. Play chime SYNCHRONOUSLY BEFORE API call
+    playKitchenChime();
+
     // 2. Fetch latest orders immediately from API to guarantee exact schema alignment and sorting
     if (typeof fetchAllOrders === 'function') {
       await fetchAllOrders();
@@ -916,9 +929,6 @@ function setupSocketListeners() {
     if (typeof updateAllUI === 'function') {
       updateAllUI();
     }
-
-    // 4. Play chime
-    playKitchenChime();
 
     // 5. Toast
     if (typeof showToast === 'function') {
