@@ -298,6 +298,7 @@ async function fetchAllOrders() {
     const data = await res.json();
     if (res.ok) {
       allOrdersData = data;
+      calculateAndRenderDashboardKPIs();
       updateAllUI();
     }
   } catch (err) {
@@ -319,143 +320,176 @@ async function fetchAllProducts() {
   }
 }
 
+function calculateAndRenderDashboardKPIs() {
+  const isDashboard = document.getElementById('kpi-revenue');
+  if (!isDashboard) return;
+
+  const orders = Array.isArray(window.allOrdersData) ? window.allOrdersData : [];
+  console.log('🔍 [AUDIT] Total Raw Orders Available in Memory:', orders.length);
+
+  // 1. Bulletproof Date Matching (IST / Local Day Match)
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const currentDate = now.getDate();
+
+  const isToday = (dateInput) => {
+    if (!dateInput) return true; // If order date is missing, treat as current session order
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return true;
+    return d.getFullYear() === currentYear && d.getMonth() === currentMonth && d.getDate() === currentDate;
+  };
+
+  const todayOrders = orders.filter(o => isToday(o.createdAt || o.date || o.timestamp));
+  console.log('🔍 [AUDIT] Filtered Today Orders Count:', todayOrders.length);
+
+  // Status Normalizer
+  const getStatus = (o) => (o.status || '').toString().toLowerCase().trim();
+
+  // Metric 1: Total Orders
+  const totalEl = document.querySelector('#todayTotalOrders') || document.querySelector('#kpi-orders') || document.querySelector('[data-kpi="total-orders"]');
+  if (totalEl) totalEl.innerText = todayOrders.length;
+
+  // Metric 2: Completed Orders
+  const completedOrders = todayOrders.filter(o => ['completed', 'served', 'ready_to_serve'].includes(getStatus(o)));
+  const completedEl = document.querySelector('#completedOrdersCount') || document.querySelector('[data-kpi="completed-orders"]');
+  if (completedEl) completedEl.innerText = completedOrders.length;
+
+  // Metric 3: Cancelled / Rejected Orders
+  const cancelledOrders = todayOrders.filter(o => ['rejected', 'cancelled', 'canceled'].includes(getStatus(o)));
+  const cancelledEl = document.querySelector('#cancelledOrdersCount') || document.querySelector('#kpi-pending') || document.querySelector('[data-kpi="cancelled-orders"]');
+  if (cancelledEl) cancelledEl.innerText = cancelledOrders.length;
+  
+  const cancelledLabel = document.querySelector('#cancelledOrdersLabel');
+  if (cancelledLabel) cancelledLabel.innerText = 'Cancelled Orders';
+
+  // Metric 4: Revenue & Avg Order Value
+  const nonRejectedOrders = todayOrders.filter(o => !['rejected', 'cancelled', 'canceled'].includes(getStatus(o)));
+  const totalRevenue = nonRejectedOrders.reduce((sum, o) => {
+    const amt = parseFloat(o.total || o.totalAmount || o.grandTotal || 0);
+    return sum + (isNaN(amt) ? 0 : amt);
+  }, 0);
+
+  const avgOrderValue = nonRejectedOrders.length > 0 ? (totalRevenue / nonRejectedOrders.length) : 0;
+  
+  const revenueEl = document.querySelector('#todayRevenue') || document.querySelector('#kpi-revenue') || document.querySelector('[data-kpi="today-revenue"]');
+  if (revenueEl) revenueEl.innerText = `₹${totalRevenue.toFixed(2)}`;
+
+  const avgEl = document.querySelector('#avgOrderValue') || document.querySelector('#kpi-aov') || document.querySelector('[data-kpi="avg-order-value"]');
+  if (avgEl) avgEl.innerText = `₹${avgOrderValue.toFixed(2)}`;
+
+  // Metric 5: Sales by Category Aggregation
+  const categoryMap = {
+    'FRIES': { count: 0, revenue: 0 },
+    "MOMO'S": { count: 0, revenue: 0 },
+    'MAGGI': { count: 0, revenue: 0 },
+    'PASTA': { count: 0, revenue: 0 },
+    'PIZZA': { count: 0, revenue: 0 },
+    'BEVERAGES': { count: 0, revenue: 0 }
+  };
+
+  nonRejectedOrders.forEach(order => {
+    const items = Array.isArray(order.items) ? order.items : [];
+    items.forEach(item => {
+      const name = (item.name || '').toLowerCase();
+      const rawCategory = (item.category || item.categoryName || (item.product && item.product.category) || '').toUpperCase().trim();
+      let assignedCategory = 'FRIES';
+
+      // Cross reference with allProductsData if category is missing
+      let resolvedCategory = rawCategory;
+      if (!resolvedCategory || resolvedCategory === 'GENERAL' || resolvedCategory === 'UNCATEGORIZED' || resolvedCategory === 'OTHER') {
+        if (Array.isArray(window.allProductsData)) {
+          const product = window.allProductsData.find(p => p.name.toLowerCase() === name || p._id === item.productId || p._id === item.menuItemId);
+          if (product) resolvedCategory = (product.category || '').toUpperCase().trim();
+        }
+      }
+
+      if (resolvedCategory && categoryMap[resolvedCategory]) {
+        assignedCategory = resolvedCategory;
+      } else if (name.includes('momo')) {
+        assignedCategory = "MOMO'S";
+      } else if (name.includes('maggi') || name.includes('noodle')) {
+        assignedCategory = 'MAGGI';
+      } else if (name.includes('pasta')) {
+        assignedCategory = 'PASTA';
+      } else if (name.includes('pizza')) {
+        assignedCategory = 'PIZZA';
+      } else if (name.includes('shake') || name.includes('tea') || name.includes('coffee') || name.includes('drink') || name.includes('mojito') || name.includes('beverage')) {
+        assignedCategory = 'BEVERAGES';
+      } else if (name.includes('fries') || name.includes('fry') || name.includes('peri peri') || name.includes('cheese')) {
+        assignedCategory = 'FRIES';
+      }
+
+      const qty = parseInt(item.quantity || item.qty || 1, 10) || 1;
+      const price = parseFloat(item.price || item.unitPrice || (item.product && item.product.price) || 0) || 0;
+
+      categoryMap[assignedCategory].count += qty;
+      categoryMap[assignedCategory].revenue += (qty * price);
+    });
+  });
+
+  // Render Sales by Category
+  const categoryContainer = document.querySelector('#salesByCategoryContainer') || document.querySelector('.sales-by-category-list');
+  if (categoryContainer) {
+    const activeEntries = Object.entries(categoryMap).filter(([_, data]) => data.count > 0);
+    
+    if (activeEntries.length === 0) {
+      categoryContainer.innerHTML = `<div class="text-sm text-gray-400 py-3 text-center">No category sales recorded today</div>`;
+    } else {
+      categoryContainer.innerHTML = activeEntries.sort((a, b) => b[1].revenue - a[1].revenue).map(([catName, data]) => `
+        <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-700 text-xs font-bold uppercase">
+              ${catName.slice(0, 2)}
+            </div>
+            <div>
+              <p class="font-medium text-gray-900 text-sm uppercase">${catName}</p>
+              <p class="text-xs text-gray-500">${data.count} items</p>
+            </div>
+          </div>
+          <span class="font-semibold text-gray-900 text-sm">₹${data.revenue.toFixed(2)}</span>
+        </div>
+      `).join('');
+    }
+  }
+  
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  // Metric 6: Payment Breakdown (UPI vs Cash)
+  let upiAmt = 0;
+  let cashAmt = 0;
+  todayOrders.forEach(o => {
+    if ((o.paymentStatus || '').toUpperCase() !== 'PAID') return;
+    const method = (o.paymentMethod || o.paymentMode || 'UPI').toString().toUpperCase();
+    const total = parseFloat(o.total || o.totalAmount || 0) || 0;
+    if (method === 'CASH') cashAmt += total;
+    else upiAmt += total;
+  });
+
+  const totalPaid = upiAmt + cashAmt;
+  const upiPercent = totalPaid > 0 ? Math.round((upiAmt / totalPaid) * 100) : 0;
+  const cashPercent = totalPaid > 0 ? (100 - upiPercent) : 0;
+
+  const upiBar = document.querySelector('#upiBar');
+  const cashBar = document.querySelector('#cashBar');
+  const upiPctEl = document.querySelector('#upiPercent');
+  const cashPctEl = document.querySelector('#cashPercent');
+
+  if (upiBar && upiPctEl) {
+    upiBar.style.width = `${upiPercent}%`;
+    upiPctEl.innerText = `${upiPercent}%`;
+  }
+  if (cashBar && cashPctEl) {
+    cashBar.style.width = `${cashPercent}%`;
+    cashPctEl.innerText = `${cashPercent}%`;
+  }
+}
+
 window.updateAllUI = function() {
   syncKitchenBellState(allOrdersData);
+  calculateAndRenderDashboardKPIs();
   
-  const isDashboard = document.getElementById('kpi-revenue');
-  if (isDashboard) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
 
-    const todayOrders = allOrdersData.filter(order => {
-      const orderDate = new Date(order.createdAt || order.date || Date.now());
-      return orderDate >= today;
-    });
-
-    // Circle 1: Today's Total Orders
-    const totalTodayOrdersCount = todayOrders.length;
-    document.querySelector('#kpi-orders').innerText = totalTodayOrdersCount;
-
-    // Circle 2: Completed Orders
-    const completedOrders = todayOrders.filter(o => 
-      ['COMPLETED', 'SERVED', 'READY_TO_SERVE'].includes((o.status || '').toUpperCase().trim())
-    );
-    const completedEl = document.querySelector('#completedOrdersCount');
-    if (completedEl) {
-      completedEl.innerText = completedOrders.length;
-    }
-
-    // Circle 3: Cancelled / Rejected Orders (Today)
-    const cancelledTodayOrders = todayOrders.filter(o => ['REJECTED', 'CANCELLED', 'CANCELED'].includes((o.status || '').toUpperCase().trim())).length;
-    const cancelledLabel = document.querySelector('#cancelledOrdersLabel');
-    if (cancelledLabel) cancelledLabel.innerText = 'Cancelled Orders';
-    document.querySelector('#kpi-pending').innerText = cancelledTodayOrders;
-
-    // Circle 4: Avg Order Value (Today)
-    const validOrders = todayOrders.filter(o => !['REJECTED', 'CANCELLED', 'CANCELED'].includes((o.status || '').toUpperCase().trim()));
-    const todayRevenue = validOrders.reduce((sum, o) => sum + Number(o.totalAmount || o.total || 0), 0);
-
-    const avgOrderValue = validOrders.length > 0 ? (todayRevenue / validOrders.length).toFixed(2) : '0.00';
-    document.querySelector('#kpi-aov').innerText = `₹${avgOrderValue}`;
-    document.querySelector('#kpi-revenue').innerText = `₹${todayRevenue.toFixed(2)}`;
-
-    // Build a fast lookup dictionary from products list
-    const productCategoryMap = {};
-    if (Array.isArray(window.allProductsData)) {
-      window.allProductsData.forEach(p => {
-        if (p.name) productCategoryMap[p.name.toLowerCase().trim()] = p.category;
-        if (p._id) productCategoryMap[p._id] = p.category;
-      });
-    }
-
-    // Circle 5: Real "Sales by Category" Aggregation
-    const knownCategories = ['FRIES', "MOMO'S", 'MAGGI', 'PASTA', 'PIZZA', 'BEVERAGES'];
-
-    function matchCategory(item) {
-      const rawCat = (item.category || item.categoryName || '').toUpperCase().trim();
-      if (rawCat && rawCat !== 'GENERAL' && rawCat !== 'UNCATEGORIZED') {
-        const match = knownCategories.find(k => k.toUpperCase() === rawCat);
-        if (match) return match;
-      }
-
-      // Match by item name keywords if category field was omitted in earlier orders
-      const name = (item.name || '').toLowerCase();
-      if (name.includes('fries') || name.includes('fry') || name.includes('peri peri') || name.includes('cheese')) return 'FRIES';
-      if (name.includes('momo')) return "MOMO'S";
-      if (name.includes('maggi') || name.includes('noodle')) return 'MAGGI';
-      if (name.includes('pasta')) return 'PASTA';
-      if (name.includes('pizza')) return 'PIZZA';
-      if (name.includes('shake') || name.includes('tea') || name.includes('coffee') || name.includes('drink') || name.includes('beverage') || name.includes('mojito')) return 'BEVERAGES';
-
-      return 'FRIES'; // fallback default
-    }
-
-    const categoryMap = {};
-    knownCategories.forEach(cat => {
-      categoryMap[cat] = { count: 0, revenue: 0 };
-    });
-
-    const salesByCategoryContainer = document.querySelector('#salesByCategoryContainer');
-    if (salesByCategoryContainer) {
-      validOrders.forEach(order => {
-        (order.items || []).forEach(item => {
-          const cat = matchCategory(item);
-          const qty = Number(item.quantity || item.qty || 1);
-          const price = Number(item.price || (item.product && item.product.price) || 0);
-
-          if (!categoryMap[cat]) categoryMap[cat] = { count: 0, revenue: 0 };
-          categoryMap[cat].count += qty;
-          categoryMap[cat].revenue += price * qty;
-        });
-      });
-
-      const entries = Object.entries(categoryMap).filter(([_, data]) => data.count > 0);
-      if (entries.length === 0) {
-        salesByCategoryContainer.innerHTML = '<div class="text-sm text-gray-400 py-4 text-center">No category sales recorded today</div>';
-      } else {
-        salesByCategoryContainer.innerHTML = entries
-          .sort((a, b) => b[1].revenue - a[1].revenue)
-          .map(([cat, data]) => `
-            <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-              <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-700 text-xs font-bold uppercase">
-                  ${cat.slice(0, 2)}
-                </div>
-                <div>
-                  <p class="font-medium text-gray-900 text-sm uppercase">${cat}</p>
-                  <p class="text-xs text-gray-500">${data.count} items</p>
-                </div>
-              </div>
-              <span class="text-sm font-semibold text-gray-900">₹${data.revenue.toFixed(2)}</span>
-            </div>
-          `).join('');
-      }
-      
-      if (typeof lucide !== 'undefined') lucide.createIcons();
-    }
-
-    // Payment Breakdown
-    let upiTotal = 0;
-    let cashTotal = 0;
-
-    todayOrders.forEach(o => {
-      // Only count settled ones if paymentStatus is PAID (we omit unpaid)
-      if ((o.paymentStatus || '').toUpperCase() !== 'PAID') return;
-      const mode = (o.paymentMethod || o.paymentMode || 'UPI').toUpperCase();
-      const amount = Number(o.totalAmount || o.total || 0);
-      if (mode === 'CASH') cashTotal += amount;
-      else upiTotal += amount;
-    });
-
-    const totalPaid = upiTotal + cashTotal || 1;
-    const upiPercent = Math.round((upiTotal / totalPaid) * 100);
-    const cashPercent = 100 - upiPercent;
-
-    if (document.querySelector('#upiBar')) document.querySelector('#upiBar').style.width = `${upiPercent}%`;
-    if (document.querySelector('#upiPercent')) document.querySelector('#upiPercent').innerText = `${upiPercent}%`;
-    if (document.querySelector('#cashBar')) document.querySelector('#cashBar').style.width = `${cashPercent}%`;
-    if (document.querySelector('#cashPercent')) document.querySelector('#cashPercent').innerText = `${cashPercent}%`;
-  }
   
   const liveOrdersBody = document.getElementById('live-orders-body');
   if (liveOrdersBody) {
