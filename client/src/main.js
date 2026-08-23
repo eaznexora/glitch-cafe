@@ -1277,10 +1277,10 @@ window.showPaymentOptions = (orderId) => {
       <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider text-center">Select Payment Mode</p>
       <div class="grid grid-cols-2 gap-2">
         <button onclick="window.confirmPayment('${orderId}', 'CASH')" class="py-2.5 px-3 bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 font-semibold rounded-lg text-sm transition flex items-center justify-center gap-1.5 shadow-sm">
-          💵 Cash
+          Cash
         </button>
         <button onclick="window.confirmPayment('${orderId}', 'UPI')" class="py-2.5 px-3 bg-black hover:bg-gray-800 text-white font-semibold rounded-lg text-sm transition flex items-center justify-center gap-1.5 shadow-sm">
-          📱 UPI
+          UPI
         </button>
       </div>
       <button onclick="window.resetPaymentOptions('${orderId}')" class="w-full py-1 text-xs text-gray-400 hover:text-gray-600 transition text-center">Cancel</button>
@@ -1322,13 +1322,21 @@ window.confirmPayment = async (orderId, method) => {
         showToast(`Order marked as Paid via ${method}!`, 'success');
       }
       
+      // Close the Order Details sidebar/drawer
+      if (typeof closeOrderDetails === 'function') {
+        closeOrderDetails();
+      } else {
+        const closeBtn = document.querySelector('#closeOrderDetailsBtn, [data-action="close-order-details"]');
+        if (closeBtn) closeBtn.click();
+        const drawer = document.querySelector('#drawer, #orderDetailsDrawer, #orderDrawer');
+        if (drawer) drawer.classList.add('translate-x-full');
+        const backdrop = document.getElementById('drawer-backdrop');
+        if (backdrop) backdrop.classList.add('hidden');
+      }
+
+      // Refresh orders list to update table badges and metrics
       if (typeof fetchAllOrders === 'function') {
         await fetchAllOrders();
-      }
-      
-      const updatedOrder = (window.allOrdersData || []).find(o => (o._id || o.id) === orderId);
-      if (updatedOrder) {
-        window.openOrderDetails(updatedOrder._id || updatedOrder.id);
       }
     } else {
       if (typeof showToast === 'function') showToast('Failed to update payment status', 'error');
