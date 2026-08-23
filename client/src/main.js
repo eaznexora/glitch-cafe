@@ -336,11 +336,14 @@ window.updateAllUI = function() {
     const totalTodayOrdersCount = todayOrders.length;
     document.querySelector('#kpi-orders').innerText = totalTodayOrdersCount;
 
-    // Circle 2: Active Tables (Tables with pending/preparing/ongoing orders)
-    const activeOngoingOrders = allOrdersData.filter(o => ['PENDING', 'PREPARING', 'READY_TO_SERVE', 'ACCEPTED'].includes(o.status));
-    const occupiedTables = new Set(activeOngoingOrders.map(o => String(o.table || o.tableNumber))).size;
-    const totalTablesConfigured = window.TOTAL_TABLES_COUNT || 10;
-    document.querySelector('#kpi-tables').innerText = `${occupiedTables} / ${totalTablesConfigured}`;
+    // Circle 2: Completed Orders
+    const completedOrders = todayOrders.filter(o => 
+      ['COMPLETED', 'SERVED', 'READY_TO_SERVE'].includes((o.status || '').toUpperCase().trim())
+    );
+    const completedEl = document.querySelector('#completedOrdersCount');
+    if (completedEl) {
+      completedEl.innerText = completedOrders.length;
+    }
 
     // Circle 3: Cancelled / Rejected Orders (Today)
     const cancelledTodayOrders = todayOrders.filter(o => ['REJECTED', 'CANCELLED', 'CANCELED'].includes((o.status || '').toUpperCase().trim())).length;
@@ -366,52 +369,60 @@ window.updateAllUI = function() {
     }
 
     // Circle 5: Real "Sales by Category" Aggregation
-    const categorySales = {}; 
+    const knownCategories = ['FRIES', "MOMO'S", 'MAGGI', 'PASTA', 'PIZZA', 'BEVERAGES'];
+
+    function matchCategory(item) {
+      const rawCat = (item.category || item.categoryName || '').toUpperCase().trim();
+      if (rawCat && rawCat !== 'GENERAL' && rawCat !== 'UNCATEGORIZED') {
+        const match = knownCategories.find(k => k.toUpperCase() === rawCat);
+        if (match) return match;
+      }
+
+      // Match by item name keywords if category field was omitted in earlier orders
+      const name = (item.name || '').toLowerCase();
+      if (name.includes('fries') || name.includes('fry') || name.includes('peri peri') || name.includes('cheese')) return 'FRIES';
+      if (name.includes('momo')) return "MOMO'S";
+      if (name.includes('maggi') || name.includes('noodle')) return 'MAGGI';
+      if (name.includes('pasta')) return 'PASTA';
+      if (name.includes('pizza')) return 'PIZZA';
+      if (name.includes('shake') || name.includes('tea') || name.includes('coffee') || name.includes('drink') || name.includes('beverage') || name.includes('mojito')) return 'BEVERAGES';
+
+      return 'FRIES'; // fallback default
+    }
+
+    const categoryMap = {};
+    knownCategories.forEach(cat => {
+      categoryMap[cat] = { count: 0, revenue: 0 };
+    });
+
     const salesByCategoryContainer = document.querySelector('#salesByCategoryContainer');
     if (salesByCategoryContainer) {
       validOrders.forEach(order => {
         (order.items || []).forEach(item => {
-          let resolvedCategory = 
-            item.category || 
-            item.categoryName || 
-            (item.product && item.product.category) ||
-            productCategoryMap[item.name?.toLowerCase()?.trim()] ||
-            productCategoryMap[item.productId] ||
-            'Uncategorized';
-
-          // Skip invalid / empty labels
-          if (resolvedCategory === 'General' || resolvedCategory === 'Uncategorized' || resolvedCategory === 'Other') {
-            // Attempt keyword heuristics if still unmapped
-            const nameLower = (item.name || '').toLowerCase();
-            if (nameLower.includes('fries')) resolvedCategory = 'Fries';
-            else if (nameLower.includes('momo')) resolvedCategory = "Momo's";
-            else if (nameLower.includes('burger')) resolvedCategory = 'Burgers';
-            else if (nameLower.includes('shake') || nameLower.includes('tea') || nameLower.includes('coffee') || nameLower.includes('mojito')) resolvedCategory = 'Beverages';
-          }
-
+          const cat = matchCategory(item);
           const qty = Number(item.quantity || item.qty || 1);
           const price = Number(item.price || (item.product && item.product.price) || 0);
 
-          if (!categorySales[resolvedCategory]) categorySales[resolvedCategory] = { count: 0, revenue: 0 };
-          categorySales[resolvedCategory].count += qty;
-          categorySales[resolvedCategory].revenue += price * qty;
+          if (!categoryMap[cat]) categoryMap[cat] = { count: 0, revenue: 0 };
+          categoryMap[cat].count += qty;
+          categoryMap[cat].revenue += price * qty;
         });
       });
 
-      const entries = Object.entries(categorySales);
+      const entries = Object.entries(categoryMap).filter(([_, data]) => data.count > 0);
       if (entries.length === 0) {
-        salesByCategoryContainer.innerHTML = '<p class="text-sm text-gray-400 py-4 text-center">No category sales recorded today</p>';
+        salesByCategoryContainer.innerHTML = '<div class="text-sm text-gray-400 py-4 text-center">No category sales recorded today</div>';
       } else {
         salesByCategoryContainer.innerHTML = entries
           .sort((a, b) => b[1].revenue - a[1].revenue)
           .map(([cat, data]) => `
             <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
               <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-700 text-sm font-bold">
-                  ${cat.charAt(0).toUpperCase()}
+                <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-700 text-xs font-bold uppercase">
+                  ${cat.slice(0, 2)}
                 </div>
                 <div>
-                  <p class="font-medium text-gray-900 text-sm">${cat}</p>
+                  <p class="font-medium text-gray-900 text-sm uppercase">${cat}</p>
                   <p class="text-xs text-gray-500">${data.count} items</p>
                 </div>
               </div>
