@@ -112,11 +112,11 @@
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 lg:gap-6 mb-8">
           <div class="card bg-monochrome-900 text-monochrome-white transform transition-transform hover:-translate-y-1">
             <h3 class="text-sm font-medium text-gray-300 mb-1">Today's Revenue</h3>
-            <p class="text-3xl font-bold" id="kpi-revenue">₹0</p>
+            <p class="text-3xl font-bold" id="todayRevenue">₹0</p>
           </div>
           <div class="card transform transition-transform hover:-translate-y-1">
             <h3 class="text-sm font-medium text-gray-500 mb-1">Total Orders</h3>
-            <p class="text-3xl font-bold text-monochrome-900" id="kpi-orders">0</p>
+            <p class="text-3xl font-bold text-monochrome-900" id="totalOrders">0</p>
           </div>
           <div class="card transform transition-transform hover:-translate-y-1">
             <h3 class="text-sm font-medium text-gray-500 mb-1">Completed Orders</h3>
@@ -124,11 +124,11 @@
           </div>
           <div class="card transform transition-transform hover:-translate-y-1">
             <h3 class="text-sm font-medium text-gray-500 mb-1" id="cancelledOrdersLabel">Cancelled Orders</h3>
-            <p class="text-3xl font-bold text-monochrome-900" id="kpi-pending">0</p>
+            <p class="text-3xl font-bold text-monochrome-900" id="cancelledOrdersCount">0</p>
           </div>
           <div class="card transform transition-transform hover:-translate-y-1">
             <h3 class="text-sm font-medium text-gray-500 mb-1">Avg Order Value</h3>
-            <p class="text-3xl font-bold text-monochrome-900" id="kpi-aov">₹0</p>
+            <p class="text-3xl font-bold text-monochrome-900" id="avgOrderValue">₹0</p>
           </div>
         </div>
 
@@ -241,6 +241,153 @@
       lucide.createIcons();
     </script>
     <script src="./src/main.js"></script>
+    <script>
+      async function loadAndRenderIndexDashboard() {
+        const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
+
+        try {
+          const res = await fetch(`${apiBase}/orders`);
+          if (!res.ok) return;
+          const json = await res.json();
+          const orders = Array.isArray(json) ? json : (json.orders || []);
+
+          const now = new Date();
+          const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+          // Check if order is from today
+          const isToday = (dateInput) => {
+            if (!dateInput) return true;
+            const d = new Date(dateInput);
+            if (isNaN(d.getTime())) return true;
+            return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+          };
+
+          const todayOrders = orders.filter(o => isToday(o.createdAt || o.date || o.timestamp));
+
+          const normalize = (str) => (str || '').toString().toLowerCase().trim();
+
+          // 1. Total Orders
+          const totalOrders = todayOrders.length;
+
+          // 2. Completed Orders
+          const completedOrders = todayOrders.filter(o => ['completed', 'served', 'ready to serve', 'ready_to_serve'].includes(normalize(o.status))).length;
+
+          // 3. Cancelled / Rejected Orders
+          const cancelledOrders = todayOrders.filter(o => ['rejected', 'cancelled', 'canceled'].includes(normalize(o.status))).length;
+
+          // 4. Non-cancelled orders for Revenue & Avg
+          const validOrders = todayOrders.filter(o => !['rejected', 'cancelled', 'canceled'].includes(normalize(o.status)));
+          const revenue = validOrders.reduce((sum, o) => sum + (parseFloat(o.total || o.totalAmount || 0) || 0), 0);
+          const avgOrderVal = validOrders.length > 0 ? (revenue / validOrders.length) : 0;
+
+          // Direct DOM Updates (Using querySelector to handle both IDs and classes)
+          const setElemText = (selector, val) => {
+            const el = document.querySelector(selector);
+            if (el) el.innerText = val;
+          };
+
+          setElemText('#todayRevenue, [data-kpi="revenue"]', `₹${revenue.toFixed(1)}`);
+          setElemText('#totalOrders, [data-kpi="total-orders"]', totalOrders);
+          setElemText('#completedOrders, #completedOrdersCount, [data-kpi="completed-orders"]', completedOrders);
+          setElemText('#cancelledOrders, #cancelledOrdersCount, [data-kpi="cancelled-orders"]', cancelledOrders);
+          setElemText('#avgOrderValue, [data-kpi="avg-order-value"]', `₹${avgOrderVal.toFixed(1)}`);
+
+          // 5. Sales by Category
+          const categoryMap = {
+            'FRIES': { count: 0, revenue: 0 },
+            "MOMO'S": { count: 0, revenue: 0 },
+            'MAGGI': { count: 0, revenue: 0 },
+            'PASTA': { count: 0, revenue: 0 },
+            'PIZZA': { count: 0, revenue: 0 },
+            'BEVERAGES': { count: 0, revenue: 0 }
+          };
+
+          validOrders.forEach(order => {
+            (order.items || []).forEach(item => {
+              const name = (item.name || '').toLowerCase();
+              let cat = 'FRIES';
+
+              if (name.includes('momo')) cat = "MOMO'S";
+              else if (name.includes('maggi') || name.includes('noodle')) cat = 'MAGGI';
+              else if (name.includes('pasta')) cat = 'PASTA';
+              else if (name.includes('pizza')) cat = 'PIZZA';
+              else if (name.includes('shake') || name.includes('tea') || name.includes('coffee') || name.includes('drink')) cat = 'BEVERAGES';
+              else if (item.category) {
+                const matched = Object.keys(categoryMap).find(k => k.toLowerCase() === item.category.toLowerCase());
+                if (matched) cat = matched;
+              }
+
+              const qty = parseInt(item.quantity || item.qty || 1, 10) || 1;
+              const price = parseFloat(item.price || item.unitPrice || (item.product && item.product.price) || 0) || 0;
+
+              categoryMap[cat].count += qty;
+              categoryMap[cat].revenue += (price * qty);
+            });
+          });
+
+          const categoryContainer = document.querySelector('#salesByCategoryContainer, .sales-by-category-list, [data-container="sales-category"]');
+          if (categoryContainer) {
+            const activeCats = Object.entries(categoryMap).filter(([_, data]) => data.count > 0);
+            if (activeCats.length === 0) {
+              categoryContainer.innerHTML = `<p class="text-sm text-gray-400 py-4 text-center">No sales recorded yet today</p>`;
+            } else {
+              categoryContainer.innerHTML = activeCats.map(([cat, data]) => `
+                <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-700 text-xs font-bold uppercase">
+                      ${cat.slice(0, 2)}
+                    </div>
+                    <div>
+                      <p class="font-medium text-gray-900 text-sm uppercase">${cat}</p>
+                      <p class="text-xs text-gray-500">${data.count} items</p>
+                    </div>
+                  </div>
+                  <span class="font-semibold text-gray-900 text-sm">₹${data.revenue.toFixed(2)}</span>
+                </div>
+              `).join('');
+            }
+          }
+
+          // 6. Payment Breakdown (UPI vs Cash)
+          let upi = 0, cash = 0;
+          validOrders.forEach(o => {
+            if ((o.paymentStatus || '').toUpperCase() !== 'PAID') return;
+            const mode = (o.paymentMethod || o.paymentMode || 'UPI').toUpperCase();
+            const amt = parseFloat(o.total || o.totalAmount || 0) || 0;
+            if (mode === 'CASH') cash += amt;
+            else upi += amt;
+          });
+
+          const totalPaid = upi + cash || 1;
+          const upiPct = totalPaid > 1 ? Math.round((upi / totalPaid) * 100) : (upi > 0 ? 100 : 0);
+          const cashPct = totalPaid > 1 ? (100 - upiPct) : (cash > 0 ? 100 : 0);
+
+          const upiBar = document.querySelector('#upiBar');
+          const cashBar = document.querySelector('#cashBar');
+          const upiPctEl = document.querySelector('#upiPercent');
+          const cashPctEl = document.querySelector('#cashPercent');
+
+          if (upiBar && upiPctEl) {
+            upiBar.style.width = `${upiPct}%`;
+            upiPctEl.innerText = `${upiPct}%`;
+          }
+          if (cashBar && cashPctEl) {
+            cashBar.style.width = `${cashPct}%`;
+            cashPctEl.innerText = `${cashPct}%`;
+          }
+
+        } catch (err) {
+          console.error('Error loading index.html dashboard analytics:', err);
+        }
+      }
+
+      // Call on load and on real-time socket events
+      document.addEventListener('DOMContentLoaded', loadAndRenderIndexDashboard);
+      if (window.socket) {
+        window.socket.on('order:new', loadAndRenderIndexDashboard);
+        window.socket.on('order:status_changed', loadAndRenderIndexDashboard);
+      }
+    </script>
   </body>
 </html>
 
