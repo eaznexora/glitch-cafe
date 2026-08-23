@@ -73,6 +73,72 @@ async function init() {
   
   // Timer for ticket elapsed time (used in both KDS and Orders view)
   setInterval(updateTicketTimers, 60000); 
+  
+  // Payment Mode Modal Bindings
+  const btnUpi = document.getElementById('btn-pay-upi');
+  const btnCash = document.getElementById('btn-pay-cash');
+  const btnConfirmPay = document.getElementById('btn-confirm-pay');
+  const btnCancelPay = document.getElementById('btn-cancel-pay');
+  
+  if (btnUpi && btnCash && btnConfirmPay && btnCancelPay) {
+    btnUpi.addEventListener('click', () => {
+      if (window._pendingPaymentUpdate) {
+        window._pendingPaymentUpdate.selectedMethod = 'UPI';
+        btnUpi.classList.add('border-monochrome-900', 'bg-gray-50');
+        btnCash.classList.remove('border-monochrome-900', 'bg-gray-50');
+        btnConfirmPay.disabled = false;
+      }
+    });
+    
+    btnCash.addEventListener('click', () => {
+      if (window._pendingPaymentUpdate) {
+        window._pendingPaymentUpdate.selectedMethod = 'CASH';
+        btnCash.classList.add('border-monochrome-900', 'bg-gray-50');
+        btnUpi.classList.remove('border-monochrome-900', 'bg-gray-50');
+        btnConfirmPay.disabled = false;
+      }
+    });
+    
+    btnCancelPay.addEventListener('click', () => {
+      const modalBackdrop = document.getElementById('payment-mode-modal-backdrop');
+      const modal = document.getElementById('payment-mode-modal');
+      
+      modal.querySelector('.bg-white').classList.remove('scale-100');
+      modal.querySelector('.bg-white').classList.add('scale-95');
+      modal.classList.add('opacity-0');
+      modalBackdrop.classList.add('opacity-0');
+      
+      setTimeout(() => {
+        modal.classList.add('hidden', 'pointer-events-none');
+        modalBackdrop.classList.add('hidden');
+      }, 300);
+      
+      window._pendingPaymentUpdate = null;
+    });
+    
+    btnConfirmPay.addEventListener('click', () => {
+      if (window._pendingPaymentUpdate && window._pendingPaymentUpdate.selectedMethod) {
+        const { id, newStatus, newPaymentStatus, selectedMethod } = window._pendingPaymentUpdate;
+        
+        // Hide modal
+        const modalBackdrop = document.getElementById('payment-mode-modal-backdrop');
+        const modal = document.getElementById('payment-mode-modal');
+        modal.querySelector('.bg-white').classList.remove('scale-100');
+        modal.querySelector('.bg-white').classList.add('scale-95');
+        modal.classList.add('opacity-0');
+        modalBackdrop.classList.add('opacity-0');
+        setTimeout(() => {
+          modal.classList.add('hidden', 'pointer-events-none');
+          modalBackdrop.classList.add('hidden');
+        }, 300);
+        
+        window._pendingPaymentUpdate = null;
+        
+        // Execute original update but with chosen paymentMethod
+        executeOrderStatusUpdate(id, newStatus, newPaymentStatus, selectedMethod);
+      }
+    });
+  }
 }
 
 // ----------------- SHARED / UTILS ----------------- //
@@ -262,51 +328,56 @@ window.updateAllUI = function() {
     document.querySelector('#kpi-tables').innerText = `${occupiedTables} / ${totalTablesConfigured}`;
 
     // Circle 3: Cancelled / Rejected Orders (Today)
-    const cancelledTodayOrders = todayOrders.filter(o => ['REJECTED', 'CANCELLED'].includes(o.status)).length;
+    const cancelledTodayOrders = todayOrders.filter(o => ['REJECTED', 'CANCELLED', 'CANCELED'].includes((o.status || '').toUpperCase().trim())).length;
     const cancelledLabel = document.querySelector('#cancelledOrdersLabel');
     if (cancelledLabel) cancelledLabel.innerText = 'Cancelled Orders';
     document.querySelector('#kpi-pending').innerText = cancelledTodayOrders;
 
     // Circle 4: Avg Order Value (Today)
-    const todayRevenue = todayOrders
-      .filter(o => o.status !== 'REJECTED' && o.status !== 'CANCELLED')
-      .reduce((sum, o) => sum + Number(o.totalAmount || o.total || 0), 0);
+    const validOrders = todayOrders.filter(o => !['REJECTED', 'CANCELLED', 'CANCELED'].includes((o.status || '').toUpperCase().trim()));
+    const todayRevenue = validOrders.reduce((sum, o) => sum + Number(o.totalAmount || o.total || 0), 0);
 
-    const validOrdersCount = todayOrders.filter(o => o.status !== 'REJECTED' && o.status !== 'CANCELLED').length;
-    const avgOrderValue = validOrdersCount > 0 ? (todayRevenue / validOrdersCount).toFixed(2) : '0.00';
+    const avgOrderValue = validOrders.length > 0 ? (todayRevenue / validOrders.length).toFixed(2) : '0.00';
     document.querySelector('#kpi-aov').innerText = `₹${avgOrderValue}`;
-    document.querySelector('#kpi-revenue').innerText = `₹${todayRevenue.toLocaleString()}`;
+    document.querySelector('#kpi-revenue').innerText = `₹${todayRevenue.toFixed(2)}`;
 
     // Circle 5: Real "Sales by Category" Aggregation
     const categorySales = {}; 
     const salesByCategoryContainer = document.querySelector('#salesByCategoryContainer');
     if (salesByCategoryContainer) {
-      todayOrders.forEach(order => {
-        if (order.status === 'REJECTED' || order.status === 'CANCELLED') return;
+      validOrders.forEach(order => {
         (order.items || []).forEach(item => {
-          const cat = item.category || item.product?.category || 'General';
+          const cat = item.category || item.categoryName || (item.product && item.product.category) || 'General';
+          const qty = Number(item.quantity || item.qty || 1);
+          const price = Number(item.price || (item.product && item.product.price) || 0);
+
           if (!categorySales[cat]) categorySales[cat] = { count: 0, revenue: 0 };
-          categorySales[cat].count += Number(item.quantity || 1);
-          categorySales[cat].revenue += Number(item.price || 0) * Number(item.quantity || 1);
+          categorySales[cat].count += qty;
+          categorySales[cat].revenue += price * qty;
         });
       });
 
-      salesByCategoryContainer.innerHTML = Object.keys(categorySales)
-        .sort((a, b) => categorySales[b].revenue - categorySales[a].revenue)
-        .map(cat => `
-          <div class="flex items-center justify-between">
-            <div class="flex items-center">
-              <div class="w-8 h-8 rounded bg-gray-100 flex items-center justify-center mr-3">
-                <i data-lucide="tag" class="h-4 w-4 text-gray-600"></i>
+      const entries = Object.entries(categorySales);
+      if (entries.length === 0) {
+        salesByCategoryContainer.innerHTML = '<p class="text-sm text-gray-400 py-4 text-center">No category sales recorded today</p>';
+      } else {
+        salesByCategoryContainer.innerHTML = entries
+          .sort((a, b) => b[1].revenue - a[1].revenue)
+          .map(([cat, data]) => `
+            <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-700 text-sm font-bold">
+                  ${cat.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p class="font-medium text-gray-900 text-sm">${cat}</p>
+                  <p class="text-xs text-gray-500">${data.count} items</p>
+                </div>
               </div>
-              <div>
-                <p class="text-sm font-medium text-monochrome-900">${cat}</p>
-                <p class="text-xs text-gray-500">${categorySales[cat].count} items</p>
-              </div>
+              <span class="text-sm font-semibold text-gray-900">₹${data.revenue.toFixed(2)}</span>
             </div>
-            <span class="text-sm font-bold">₹${categorySales[cat].revenue.toLocaleString()}</span>
-          </div>
-        `).join('') || '<p class="text-sm text-gray-500">No sales today.</p>';
+          `).join('');
+      }
       
       if (typeof lucide !== 'undefined') lucide.createIcons();
     }
@@ -316,7 +387,8 @@ window.updateAllUI = function() {
     let cashTotal = 0;
 
     todayOrders.forEach(o => {
-      if (o.status === 'REJECTED' || o.status === 'CANCELLED' || o.paymentStatus !== 'PAID') return;
+      // Only count settled ones if paymentStatus is PAID (we omit unpaid)
+      if ((o.paymentStatus || '').toUpperCase() !== 'PAID') return;
       const mode = (o.paymentMethod || o.paymentMode || 'UPI').toUpperCase();
       const amount = Number(o.totalAmount || o.total || 0);
       if (mode === 'CASH') cashTotal += amount;
@@ -972,14 +1044,53 @@ window.submitRejection = async (reason) => {
 
 // ----------------- SHARED API / SOCKET LOGIC ----------------- //
 
+window._pendingPaymentUpdate = null;
+
 window.updateOrderStatus = async (id, newStatus, newPaymentStatus = null) => {
+  try {
+    if (newPaymentStatus === 'PAID') {
+      const modalBackdrop = document.getElementById('payment-mode-modal-backdrop');
+      const modal = document.getElementById('payment-mode-modal');
+      
+      if (modalBackdrop && modal) {
+        modalBackdrop.classList.remove('hidden');
+        modal.classList.remove('hidden');
+        
+        setTimeout(() => {
+          modalBackdrop.classList.remove('opacity-0');
+          modal.classList.remove('opacity-0', 'pointer-events-none');
+          modal.querySelector('.bg-white').classList.remove('scale-95');
+          modal.querySelector('.bg-white').classList.add('scale-100');
+        }, 10);
+        
+        const upiBtn = document.getElementById('btn-pay-upi');
+        const cashBtn = document.getElementById('btn-pay-cash');
+        if (upiBtn) upiBtn.classList.remove('border-monochrome-900', 'bg-gray-50');
+        if (cashBtn) cashBtn.classList.remove('border-monochrome-900', 'bg-gray-50');
+        const confirmBtn = document.getElementById('btn-confirm-pay');
+        if (confirmBtn) confirmBtn.disabled = true;
+        
+        window._pendingPaymentUpdate = { id, newStatus, newPaymentStatus, selectedMethod: null };
+        return; // Wait for modal confirmation
+      }
+    }
+    
+    await executeOrderStatusUpdate(id, newStatus, newPaymentStatus);
+  } catch (err) {
+    console.error('Failed to update order:', err);
+  }
+};
+
+window.executeOrderStatusUpdate = async (id, newStatus, newPaymentStatus, paymentMethod = null) => {
   try {
     const payload = {};
     if (newStatus) payload.status = newStatus;
     if (newPaymentStatus) {
       payload.paymentStatus = newPaymentStatus;
-      if (newPaymentStatus === 'PAID') {
-        payload.paymentMethod = 'UPI'; // Defaulting to UPI across admin panels where method is not specified
+      if (paymentMethod) {
+        payload.paymentMethod = paymentMethod;
+      } else if (newPaymentStatus === 'PAID') {
+        payload.paymentMethod = 'UPI'; // fallback
       }
     }
     
@@ -988,7 +1099,7 @@ window.updateOrderStatus = async (id, newStatus, newPaymentStatus = null) => {
       if (newStatus) order.status = newStatus;
       if (newPaymentStatus) {
         order.paymentStatus = newPaymentStatus;
-        if (newPaymentStatus === 'PAID') order.paymentMethod = 'UPI';
+        if (payload.paymentMethod) order.paymentMethod = payload.paymentMethod;
       }
       updateAllUI();
     }
@@ -998,9 +1109,9 @@ window.updateOrderStatus = async (id, newStatus, newPaymentStatus = null) => {
       headers: getAuthHeaders(),
       body: JSON.stringify(payload)
     });
-    closeOrderDrawer(); // Auto close drawer on action if present
+    if (typeof closeOrderDrawer === 'function') closeOrderDrawer(); 
   } catch (err) {
-    console.error('Failed to update order:', err);
+    console.error('Failed to execute order update:', err);
   }
 };
 

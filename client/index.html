@@ -211,6 +211,31 @@
         </div>
       </main>
     </div>
+
+    <!-- Payment Mode Modal -->
+    <div id="payment-mode-modal-backdrop" class="fixed inset-0 bg-black/60 z-[9990] hidden opacity-0 transition-opacity duration-300"></div>
+    <div id="payment-mode-modal" class="fixed inset-0 z-[9991] flex items-center justify-center hidden opacity-0 transition-opacity duration-300 pointer-events-none p-4">
+      <div class="bg-white rounded-2xl p-6 shadow-2xl w-full max-w-sm pointer-events-auto transform scale-95 transition-transform duration-300">
+        <h3 class="text-xl font-bold text-gray-900 mb-2">Select Payment Method</h3>
+        <p class="text-sm text-gray-500 mb-6">How is the customer paying for this order?</p>
+        
+        <div class="grid grid-cols-2 gap-4 mb-6">
+          <button id="btn-pay-upi" class="pay-method-btn border-2 border-gray-200 rounded-xl py-4 flex flex-col items-center justify-center hover:border-black transition-colors focus:outline-none">
+            <i data-lucide="qr-code" class="h-8 w-8 mb-2 text-monochrome-900"></i>
+            <span class="font-bold text-gray-900">UPI / QR</span>
+          </button>
+          <button id="btn-pay-cash" class="pay-method-btn border-2 border-gray-200 rounded-xl py-4 flex flex-col items-center justify-center hover:border-black transition-colors focus:outline-none">
+            <i data-lucide="banknote" class="h-8 w-8 mb-2 text-monochrome-900"></i>
+            <span class="font-bold text-gray-900">Cash</span>
+          </button>
+        </div>
+        
+        <div class="flex gap-3">
+          <button id="btn-cancel-pay" class="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors">Cancel</button>
+          <button id="btn-confirm-pay" class="flex-1 py-3 bg-monochrome-900 text-white font-bold rounded-xl hover:bg-black transition-colors" disabled>Confirm</button>
+        </div>
+      </div>
+    </div>
     
     <script>
       lucide.createIcons();
