@@ -102,7 +102,15 @@
             <button id="btn-audio-toggle" onclick="toggleAudio()" class="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs px-3 py-1.5 rounded-lg border border-slate-300 font-bold transition-colors">
               🔕 Muted (Away)
             </button>
-            <a href="kds.html" class="btn-primary text-sm hidden sm:flex items-center"><i data-lucide="monitor-play" class="h-4 w-4 mr-2"></i>Chef KDS Screen</a>
+            <a href="./orders.html" id="viewKdsBtn" class="flex items-center gap-2 px-4 py-2 bg-black hover:bg-gray-800 text-white rounded-lg text-sm font-medium transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              </svg>
+              <span>View KDS</span>
+            </a>
+            <button type="button" onclick="openNewOrderModal()" class="flex items-center gap-2 px-4 py-2 bg-black hover:bg-gray-800 text-white rounded-lg text-sm font-medium transition cursor-pointer">
+              <span>+ New Order</span>
+            </button>
             <div class="flex items-center space-x-2 text-sm font-medium text-green-600">
               <span class="w-2 h-2 rounded-full bg-green-600 animate-pulse"></span>
               <span class="hidden sm:inline">Live Sync Connected</span>

@@ -103,8 +103,15 @@
         <div class="flex items-center space-x-2 lg:space-x-4 overflow-x-auto no-scrollbar py-1">
           <span class="hidden lg:block text-sm font-medium text-gray-600 mr-4">Main Branch</span>
           <button class="btn-outline text-sm flex items-center whitespace-nowrap"><i data-lucide="download" class="h-4 w-4 lg:mr-2"></i><span class="hidden lg:inline">Export</span></button>
-          <a href="kds.html" class="btn-primary text-sm flex items-center whitespace-nowrap"><i data-lucide="monitor-play" class="h-4 w-4 lg:mr-2"></i><span class="hidden lg:inline">View KDS</span></a>
-          <button class="btn-primary text-sm flex items-center whitespace-nowrap"><i data-lucide="plus" class="h-4 w-4 lg:mr-1"></i><span class="hidden lg:inline">New Order</span></button>
+          <a href="./orders.html" id="viewKdsBtn" class="flex items-center gap-2 px-4 py-2 bg-black hover:bg-gray-800 text-white rounded-lg text-sm font-medium transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+            <span>View KDS</span>
+          </a>
+          <button type="button" onclick="openNewOrderModal()" class="flex items-center gap-2 px-4 py-2 bg-black hover:bg-gray-800 text-white rounded-lg text-sm font-medium transition cursor-pointer">
+            <span>+ New Order</span>
+          </button>
         </div>
       </header>
 

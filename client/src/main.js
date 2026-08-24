@@ -1583,3 +1583,130 @@ window.generateReceiptPDF = function() {
     document.head.appendChild(script);
   }
 };
+
+window.openNewOrderModal = function() {
+  let modal = document.getElementById('newOrderModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'newOrderModal';
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4';
+    modal.innerHTML = `
+      <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+        <div class="flex items-center justify-between border-b pb-3">
+          <h3 class="text-lg font-bold text-gray-900">Create Counter / Table Order</h3>
+          <button onclick="closeNewOrderModal()" class="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs font-semibold text-gray-600">Table / Tag</label>
+            <select id="manualTableSelect" class="w-full mt-1 border rounded-lg p-2 text-sm bg-gray-50 focus:bg-white">
+              <option value="Table 1">Table 1</option>
+              <option value="Table 2">Table 2</option>
+              <option value="Table 3">Table 3</option>
+              <option value="Table 4">Table 4</option>
+              <option value="Takeaway">Takeaway</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-gray-600">Customer Name</label>
+            <input type="text" id="manualCustomerName" placeholder="Walk-in Guest" class="w-full mt-1 border rounded-lg p-2 text-sm">
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs font-semibold text-gray-600">Add Items (Format: Item Name : Price : Qty)</label>
+          <div id="manualItemsList" class="space-y-2 mt-1 max-h-40 overflow-y-auto">
+            <div class="flex gap-2 item-row">
+              <input type="text" placeholder="Item (e.g. Cheese Fries)" class="flex-1 border rounded-lg p-2 text-sm item-name">
+              <input type="number" placeholder="₹" class="w-20 border rounded-lg p-2 text-sm item-price">
+              <input type="number" value="1" min="1" class="w-16 border rounded-lg p-2 text-sm item-qty">
+            </div>
+          </div>
+          <button type="button" onclick="addManualItemRow()" class="mt-2 text-xs font-semibold text-blue-600 hover:underline">+ Add Another Item</button>
+        </div>
+
+        <div class="border-t pt-3 flex gap-2 justify-end">
+          <button type="button" onclick="closeNewOrderModal()" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="button" onclick="submitManualOrder()" class="px-5 py-2 bg-black text-white rounded-lg text-sm font-semibold hover:bg-gray-800">Punch Order</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+  modal.classList.remove('hidden');
+};
+
+window.closeNewOrderModal = function() {
+  const modal = document.getElementById('newOrderModal');
+  if (modal) modal.classList.add('hidden');
+};
+
+window.addManualItemRow = function() {
+  const list = document.getElementById('manualItemsList');
+  if (!list) return;
+  const row = document.createElement('div');
+  row.className = 'flex gap-2 item-row mt-2';
+  row.innerHTML = `
+    <input type="text" placeholder="Item Name" class="flex-1 border rounded-lg p-2 text-sm item-name">
+    <input type="number" placeholder="₹" class="w-20 border rounded-lg p-2 text-sm item-price">
+    <input type="number" value="1" min="1" class="w-16 border rounded-lg p-2 text-sm item-qty">
+  `;
+  list.appendChild(row);
+};
+
+window.submitManualOrder = async function() {
+  const table = document.getElementById('manualTableSelect')?.value || 'Table 1';
+  const customerName = document.getElementById('manualCustomerName')?.value?.trim() || 'Walk-in Guest';
+  const rows = document.querySelectorAll('.item-row');
+  
+  const items = [];
+  let total = 0;
+  
+  rows.forEach(r => {
+    const name = r.querySelector('.item-name')?.value?.trim();
+    const price = parseFloat(r.querySelector('.item-price')?.value) || 0;
+    const qty = parseInt(r.querySelector('.item-qty')?.value) || 1;
+    if (name && price > 0) {
+      items.push({ name, price, quantity: qty });
+      total += price * qty;
+    }
+  });
+
+  if (items.length === 0) {
+    if (typeof showToast === 'function') showToast('Please add at least one item with a valid price', 'error');
+    return;
+  }
+
+  const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
+  const token = localStorage.getItem('glitch_admin_token') || localStorage.getItem('token');
+
+  try {
+    const res = await fetch(`${apiBase}/orders`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({
+        table,
+        customerName,
+        items,
+        total,
+        status: 'Preparing',
+        paymentStatus: 'UNPAID'
+      })
+    });
+
+    if (res.ok) {
+      if (typeof showToast === 'function') showToast('Manual order punched successfully!', 'success');
+      closeNewOrderModal();
+      if (typeof fetchAllOrders === 'function') fetchAllOrders();
+    } else {
+      if (typeof showToast === 'function') showToast('Failed to create order', 'error');
+    }
+  } catch (err) {
+    console.error('Manual order error:', err);
+    if (typeof showToast === 'function') showToast('Network error creating order', 'error');
+  }
+};
