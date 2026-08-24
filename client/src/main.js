@@ -1719,66 +1719,29 @@ async function loadPosMenuItems() {
   const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
   const token = localStorage.getItem('glitch_admin_token') || localStorage.getItem('token');
 
-  try {
-    const res = await fetch(`${apiBase}/menu`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
-    });
-    if (res.ok) {
-      const json = await res.json();
-      window.cafeMenuItems = json.data || json.items || json || [];
-    }
-  } catch (e) {}
-
-  if (!window.cafeMenuItems || window.cafeMenuItems.length === 0) {
-    window.cafeMenuItems = [
-      {
-        id: '1',
-        name: 'Cheese Fries',
-        price: 150,
-        category: 'Fries',
-        variants: [{ name: 'Regular', price: 150 }, { name: 'Large', price: 210 }],
-        toppings: [{ name: 'Extra Cheese Blend', price: 30 }, { name: 'Peri-Peri Dip', price: 20 }, { name: 'Jalapenos', price: 25 }]
-      },
-      {
-        id: '2',
-        name: 'Piri Piri Fries',
-        price: 110,
-        category: 'Fries',
-        variants: [{ name: 'Regular', price: 110 }, { name: 'Large', price: 160 }],
-        toppings: [{ name: 'Cheese Sauce', price: 30 }, { name: 'Mayo Dip', price: 15 }]
-      },
-      {
-        id: '3',
-        name: 'Steamed Momo',
-        price: 200,
-        category: 'Momos',
-        variants: [{ name: '6 Pcs', price: 140 }, { name: '10 Pcs', price: 200 }],
-        toppings: [{ name: 'Extra Schezwan Sauce', price: 20 }, { name: 'Fried Upgrade', price: 30 }]
-      },
-      {
-        id: '4',
-        name: 'Margherita Pizza',
-        price: 220,
-        category: 'Pizza',
-        variants: [{ name: '7" Personal', price: 180 }, { name: '10" Medium', price: 280 }],
-        toppings: [{ name: 'Extra Mozzarella', price: 40 }, { name: 'Olives & Jalapenos', price: 35 }, { name: 'Garlic Crust', price: 25 }]
-      },
-      {
-        id: '5',
-        name: 'Cold Coffee',
-        price: 80,
-        category: 'Beverages',
-        variants: [{ name: 'Regular (300ml)', price: 80 }, { name: 'Large (500ml)', price: 120 }],
-        toppings: [{ name: 'Vanilla Ice Cream Scoop', price: 30 }, { name: 'Hazelnut Syrup', price: 25 }]
-      },
-      {
-        id: '6',
-        name: 'Cheese Maggi',
-        price: 100,
-        category: 'Maggi',
-        toppings: [{ name: 'Double Cheese', price: 30 }, { name: 'Butter Tadka', price: 20 }]
+  // Check if customer app menu data is already loaded in window
+  if (window.allMenuItems && window.allMenuItems.length > 0) {
+    window.cafeMenuItems = window.allMenuItems;
+  } else {
+    try {
+      const res = await fetch(`${apiBase}/menu`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        const json = await res.json();
+        window.cafeMenuItems = json.data || json.items || json || [];
       }
-    ];
+    } catch (e) {
+      console.warn('API menu fetch error:', e);
+    }
+  }
+
+  // Fallback to local stored menu if available
+  if (!window.cafeMenuItems || window.cafeMenuItems.length === 0) {
+    const cached = localStorage.getItem('cafe_menu') || localStorage.getItem('menu_items');
+    if (cached) {
+      try { window.cafeMenuItems = JSON.parse(cached); } catch (e) {}
+    }
   }
 
   renderPosMenuList(window.cafeMenuItems);
@@ -1788,35 +1751,60 @@ function renderPosMenuList(items) {
   const container = document.getElementById('posMenuContainer');
   if (!container) return;
 
-  if (items.length === 0) {
-    container.innerHTML = `<div class="col-span-2 text-center py-12 text-sm text-gray-400">No matching items found</div>`;
+  if (!items || items.length === 0) {
+    container.innerHTML = `<div class="col-span-2 text-center py-12 text-sm text-gray-400">No items available in menu.</div>`;
     return;
   }
 
   container.innerHTML = items.map(item => {
-    const hasCustomizations = (item.variants && item.variants.length > 0) || (item.toppings && item.toppings.length > 0);
     const itemId = item._id || item.id || item.name;
+    const hasVariants = Array.isArray(item.variants) && item.variants.length > 0;
+    const hasAddons = (Array.isArray(item.addOns) && item.addOns.length > 0) || (Array.isArray(item.toppings) && item.toppings.length > 0);
+    const hasCustomization = hasVariants || hasAddons;
+
+    const imgUrl = item.image || item.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300&q=80';
+    const isVeg = item.isVeg !== undefined ? item.isVeg : true;
 
     return `
-      <div class="bg-white p-3.5 rounded-xl border border-gray-200 shadow-xs hover:border-gray-300 transition flex flex-col justify-between">
-        <div>
-          <div class="flex justify-between items-start">
-            <h4 class="font-bold text-gray-900 text-sm">${item.name}</h4>
-            <span class="text-xs font-bold text-gray-800 bg-gray-100 px-2 py-0.5 rounded">₹${item.price}</span>
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition overflow-hidden flex flex-col justify-between group">
+        <!-- Card Top: Image + Veg/Non-Veg Tag -->
+        <div class="relative h-28 w-full bg-gray-100 overflow-hidden">
+          <img src="${imgUrl}" alt="${item.name}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" onerror="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300&q=80'">
+          <div class="absolute top-2 left-2 bg-white/90 backdrop-blur-sm p-1 rounded-md shadow-xs">
+            <div class="w-3 h-3 border ${isVeg ? 'border-green-600' : 'border-red-600'} flex items-center justify-center p-0.5">
+              <div class="w-1.5 h-1.5 rounded-full ${isVeg ? 'bg-green-600' : 'bg-red-600'}"></div>
+            </div>
           </div>
-          <p class="text-[11px] text-gray-400 font-medium mt-0.5">${item.category || 'Special'}</p>
+          <span class="absolute top-2 right-2 bg-black/75 text-white text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-xs">
+            ${item.category || 'General'}
+          </span>
         </div>
 
-        <div class="mt-3 flex items-center justify-between pt-2 border-t border-gray-100">
-          ${hasCustomizations ? `
-            <button type="button" onclick="openItemCustomizer('${itemId}')" class="text-xs font-bold text-black bg-gray-100 hover:bg-black hover:text-white px-3 py-1.5 rounded-lg transition">
-              + Customize
-            </button>
-          ` : `
-            <button type="button" onclick="addDirectItem('${itemId}')" class="text-xs font-bold text-white bg-black hover:bg-gray-800 px-3 py-1.5 rounded-lg transition">
-              + Add to Ticket
-            </button>
-          `}
+        <!-- Card Body -->
+        <div class="p-3 flex-1 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-start gap-1">
+              <h4 class="font-bold text-gray-900 text-sm leading-snug line-clamp-1">${item.name}</h4>
+              <span class="text-xs font-black text-gray-900 shrink-0">₹${parseFloat(item.price || 0).toFixed(2)}</span>
+            </div>
+            ${item.description ? `<p class="text-[11px] text-gray-400 mt-1 line-clamp-2">${item.description}</p>` : ''}
+          </div>
+
+          <!-- Card Actions -->
+          <div class="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between">
+            <span class="text-[10px] font-semibold text-gray-400">
+              ${hasCustomization ? 'Customizable' : 'Standard'}
+            </span>
+            ${hasCustomization ? `
+              <button type="button" onclick="openItemCustomizer('${itemId}')" class="text-xs font-bold bg-gray-100 hover:bg-black hover:text-white text-gray-900 px-3.5 py-1.5 rounded-xl transition">
+                + Customize
+              </button>
+            ` : `
+              <button type="button" onclick="addDirectItem('${itemId}')" class="text-xs font-bold bg-black hover:bg-gray-800 text-white px-3.5 py-1.5 rounded-xl transition">
+                + Add
+              </button>
+            `}
+          </div>
         </div>
       </div>
     `;
@@ -1841,40 +1829,43 @@ window.openItemCustomizer = function(itemId) {
   if (!item) return;
 
   currentCustomizingItem = item;
-  selectedVariant = (item.variants && item.variants.length > 0) ? item.variants[0] : null;
+  const variants = item.variants || [];
+  const addOns = item.addOns || item.toppings || [];
+
+  selectedVariant = variants.length > 0 ? variants[0] : null;
   selectedToppings = [];
 
   document.getElementById('customItemTitle').innerText = item.name;
-  document.getElementById('customItemBasePrice').innerText = `Base: ₹${item.price}`;
+  document.getElementById('customItemBasePrice').innerText = `Base: ₹${parseFloat(item.price || 0).toFixed(2)}`;
 
-  // Render Variants
+  // Populate Real Variants
   const varBox = document.getElementById('variantsSection');
   const varCont = document.getElementById('variantsContainer');
-  if (item.variants && item.variants.length > 0) {
+  if (variants.length > 0) {
     varBox.classList.remove('hidden');
-    varCont.innerHTML = item.variants.map((v, idx) => `
-      <label class="flex items-center justify-between p-2.5 border rounded-lg cursor-pointer hover:bg-gray-50 text-xs font-medium ${idx === 0 ? 'border-black bg-gray-50' : 'border-gray-200'}">
+    varCont.innerHTML = variants.map((v, idx) => `
+      <label class="flex items-center justify-between p-2.5 border rounded-xl cursor-pointer hover:bg-gray-50 text-xs font-medium ${idx === 0 ? 'border-black bg-gray-50' : 'border-gray-200'}">
         <input type="radio" name="itemVariantRadio" value="${idx}" onchange="selectPosVariant(${idx})" ${idx === 0 ? 'checked' : ''} class="accent-black mr-2">
-        <span class="flex-1">${v.name}</span>
-        <span class="font-bold">₹${v.price}</span>
+        <span class="flex-1">${v.name || v.size || 'Standard'}</span>
+        <span class="font-bold">₹${parseFloat(v.price || item.price).toFixed(2)}</span>
       </label>
     `).join('');
   } else {
     varBox.classList.add('hidden');
   }
 
-  // Render Toppings
+  // Populate Real Add-ons
   const topBox = document.getElementById('toppingsSection');
   const topCont = document.getElementById('toppingsContainer');
-  if (item.toppings && item.toppings.length > 0) {
+  if (addOns.length > 0) {
     topBox.classList.remove('hidden');
-    topCont.innerHTML = item.toppings.map((t, idx) => `
-      <label class="flex items-center justify-between p-2 rounded hover:bg-white cursor-pointer text-xs">
+    topCont.innerHTML = addOns.map((t, idx) => `
+      <label class="flex items-center justify-between p-2 rounded-lg hover:bg-white cursor-pointer text-xs">
         <div class="flex items-center gap-2">
           <input type="checkbox" onchange="togglePosTopping(${idx}, this.checked)" class="accent-black rounded">
-          <span>${t.name}</span>
+          <span class="text-gray-800 font-medium">${t.name}</span>
         </div>
-        <span class="font-semibold text-gray-700">+₹${t.price}</span>
+        <span class="font-bold text-gray-700">+₹${parseFloat(t.price || 0).toFixed(2)}</span>
       </label>
     `).join('');
   } else {
