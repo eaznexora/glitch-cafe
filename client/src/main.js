@@ -1792,7 +1792,7 @@ function updatePosSummary() {
 
   document.getElementById('posTotalQty').innerText = totalQty;
   document.getElementById('posTotalPrice').innerText = totalPrice.toFixed(2);
-  document.getElementById('posBtnPrice').innerText = \`₹\${totalPrice.toFixed(2)}\`;
+  document.getElementById('posBtnPrice').innerText = `₹${totalPrice.toFixed(2)}`;
 }
 
 // 3. Submit Payload matching Backend Schema
@@ -1832,11 +1832,11 @@ window.submitPosOrder = async function() {
   const token = localStorage.getItem('glitch_admin_token') || localStorage.getItem('token');
 
   try {
-    const res = await fetch(\`\${apiBase}/orders\`, {
+    const res = await fetch(`${apiBase}/orders`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: \`Bearer \${token}\` } : {})
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
       },
       body: JSON.stringify(payload)
     });
