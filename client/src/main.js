@@ -1584,23 +1584,38 @@ window.generateReceiptPDF = function() {
   }
 };
 
-window.openNewOrderModal = function() {
+window.posCart = {}; // { itemId: { item, qty } }
+window.cafeMenuItems = [];
+
+window.openNewOrderModal = async function() {
+  window.posCart = {};
+  
   let modal = document.getElementById('newOrderModal');
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'newOrderModal';
-    modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4';
-    modal.innerHTML = `
-      <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
-        <div class="flex items-center justify-between border-b pb-3">
-          <h3 class="text-lg font-bold text-gray-900">Create Counter / Table Order</h3>
-          <button onclick="closeNewOrderModal()" class="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4';
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = `
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <!-- Header -->
+      <div class="px-6 py-4 border-b flex items-center justify-between bg-gray-50">
+        <div>
+          <h3 class="text-lg font-bold text-gray-900">Counter POS / New Order</h3>
+          <p class="text-xs text-gray-500">Punch table & walk-in orders directly to KDS</p>
         </div>
-        
-        <div class="grid grid-cols-2 gap-3">
+        <button onclick="closeNewOrderModal()" class="text-gray-400 hover:text-gray-600 text-2xl font-bold leading-none">&times;</button>
+      </div>
+
+      <!-- Body: Scrollable -->
+      <div class="p-6 overflow-y-auto space-y-4 flex-1">
+        <!-- Customer & Table Metadata -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label class="text-xs font-semibold text-gray-600">Table / Tag</label>
-            <select id="manualTableSelect" class="w-full mt-1 border rounded-lg p-2 text-sm bg-gray-50 focus:bg-white">
+            <select id="posTableSelect" class="w-full mt-1 border border-gray-300 rounded-lg p-2 text-sm bg-white focus:ring-2 focus:ring-black">
               <option value="Table 1">Table 1</option>
               <option value="Table 2">Table 2</option>
               <option value="Table 3">Table 3</option>
@@ -1610,31 +1625,55 @@ window.openNewOrderModal = function() {
           </div>
           <div>
             <label class="text-xs font-semibold text-gray-600">Customer Name</label>
-            <input type="text" id="manualCustomerName" placeholder="Walk-in Guest" class="w-full mt-1 border rounded-lg p-2 text-sm">
+            <input type="text" id="posCustomerName" placeholder="Guest" class="w-full mt-1 border border-gray-300 rounded-lg p-2 text-sm">
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-gray-600">Customer Email <span class="text-gray-400 text-[10px] font-normal">(Optional)</span></label>
+            <input type="email" id="posCustomerEmail" placeholder="guest@example.com" class="w-full mt-1 border border-gray-300 rounded-lg p-2 text-sm">
           </div>
         </div>
 
+        <!-- Menu Search & Item Selector -->
         <div>
-          <label class="text-xs font-semibold text-gray-600">Add Items (Format: Item Name : Price : Qty)</label>
-          <div id="manualItemsList" class="space-y-2 mt-1 max-h-40 overflow-y-auto">
-            <div class="flex gap-2 item-row">
-              <input type="text" placeholder="Item (e.g. Cheese Fries)" class="flex-1 border rounded-lg p-2 text-sm item-name">
-              <input type="number" placeholder="₹" class="w-20 border rounded-lg p-2 text-sm item-price">
-              <input type="number" value="1" min="1" class="w-16 border rounded-lg p-2 text-sm item-qty">
-            </div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs font-semibold text-gray-700 uppercase tracking-wider">Select Menu Items</label>
+            <input type="text" id="posMenuSearch" oninput="filterPosMenu(this.value)" placeholder="Search menu..." class="border border-gray-300 rounded-lg px-2.5 py-1 text-xs w-48">
           </div>
-          <button type="button" onclick="addManualItemRow()" class="mt-2 text-xs font-semibold text-blue-600 hover:underline">+ Add Another Item</button>
+
+          <div id="posMenuContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto p-1 border rounded-xl bg-gray-50/50">
+            <div class="col-span-2 text-center py-6 text-sm text-gray-400">Loading live menu...</div>
+          </div>
         </div>
 
-        <div class="border-t pt-3 flex gap-2 justify-end">
-          <button type="button" onclick="closeNewOrderModal()" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-          <button type="button" onclick="submitManualOrder()" class="px-5 py-2 bg-black text-white rounded-lg text-sm font-semibold hover:bg-gray-800">Punch Order</button>
+        <!-- Order Summary & Total -->
+        <div class="bg-gray-50 rounded-xl p-3 border border-gray-200">
+          <div class="flex justify-between items-center text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+            <span>Selected Items (<span id="posTotalQty">0</span>)</span>
+            <span>Total: ₹<span id="posTotalPrice">0.00</span></span>
+          </div>
+          <div id="posSelectedList" class="text-xs text-gray-500 space-y-1 max-h-24 overflow-y-auto">
+            <em>No items selected yet.</em>
+          </div>
         </div>
       </div>
-    `;
-    document.body.appendChild(modal);
-  }
+
+      <!-- Footer Actions -->
+      <div class="px-6 py-3 border-t bg-gray-50 flex items-center justify-end gap-2">
+        <button type="button" onclick="closeNewOrderModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-100 font-medium transition">
+          Cancel
+        </button>
+        <button type="button" onclick="submitPosOrder()" class="px-5 py-2 bg-black hover:bg-gray-800 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2">
+          <span>Punch Order</span>
+          <span id="posBtnPrice" class="text-xs bg-gray-700 px-2 py-0.5 rounded text-white">₹0</span>
+        </button>
+      </div>
+    </div>
+  `;
+
   modal.classList.remove('hidden');
+
+  // Load Menu items from API or fallback items cache
+  await loadPosMenuItems();
 };
 
 window.closeNewOrderModal = function() {
@@ -1642,71 +1681,176 @@ window.closeNewOrderModal = function() {
   if (modal) modal.classList.add('hidden');
 };
 
-window.addManualItemRow = function() {
-  const list = document.getElementById('manualItemsList');
-  if (!list) return;
-  const row = document.createElement('div');
-  row.className = 'flex gap-2 item-row mt-2';
-  row.innerHTML = `
-    <input type="text" placeholder="Item Name" class="flex-1 border rounded-lg p-2 text-sm item-name">
-    <input type="number" placeholder="₹" class="w-20 border rounded-lg p-2 text-sm item-price">
-    <input type="number" value="1" min="1" class="w-16 border rounded-lg p-2 text-sm item-qty">
-  `;
-  list.appendChild(row);
-};
+// 2. Fetch live items from backend /menu or /api/menu
+async function loadPosMenuItems() {
+  const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
+  const token = localStorage.getItem('glitch_admin_token') || localStorage.getItem('token');
 
-window.submitManualOrder = async function() {
-  const table = document.getElementById('manualTableSelect')?.value || 'Table 1';
-  const customerName = document.getElementById('manualCustomerName')?.value?.trim() || 'Walk-in Guest';
-  const rows = document.querySelectorAll('.item-row');
-  
-  const items = [];
-  let total = 0;
-  
-  rows.forEach(r => {
-    const name = r.querySelector('.item-name')?.value?.trim();
-    const price = parseFloat(r.querySelector('.item-price')?.value) || 0;
-    const qty = parseInt(r.querySelector('.item-qty')?.value) || 1;
-    if (name && price > 0) {
-      items.push({ name, price, quantity: qty });
-      total += price * qty;
+  try {
+    const res = await fetch(`${apiBase}/menu`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      window.cafeMenuItems = json.data || json.items || json || [];
     }
-  });
+  } catch (e) {
+    console.warn('Failed to load menu from API, checking local data');
+  }
+
+  // Fallback menu items if endpoint is empty
+  if (!window.cafeMenuItems || window.cafeMenuItems.length === 0) {
+    window.cafeMenuItems = [
+      { id: '1', name: 'Cheese Fries', price: 150, category: 'Fries' },
+      { id: '2', name: 'Piri Piri Fries', price: 110, category: 'Fries' },
+      { id: '3', name: 'Steamed Momo', price: 200, category: 'Momos' },
+      { id: '4', name: 'Cheese Maggi', price: 100, category: 'Maggi' },
+      { id: '5', name: 'Cold Coffee', price: 80, category: 'Beverages' },
+      { id: '6', name: 'Diet Coke', price: 60, category: 'Beverages' },
+      { id: '7', name: 'Red Sauce Pasta', price: 180, category: 'Pasta' },
+      { id: '8', name: 'Margherita Pizza', price: 220, category: 'Pizza' }
+    ];
+  }
+
+  renderPosMenuList(window.cafeMenuItems);
+}
+
+function renderPosMenuList(items) {
+  const container = document.getElementById('posMenuContainer');
+  if (!container) return;
 
   if (items.length === 0) {
-    if (typeof showToast === 'function') showToast('Please add at least one item with a valid price', 'error');
+    container.innerHTML = `<div class="col-span-2 text-center py-6 text-sm text-gray-400">No matching items found</div>`;
     return;
   }
+
+  container.innerHTML = items.map(item => {
+    const itemId = item._id || item.id || item.name;
+    const qty = window.posCart[itemId]?.qty || 0;
+    return `
+      <div class="bg-white p-2.5 rounded-lg border border-gray-200 flex items-center justify-between shadow-xs">
+        <div>
+          <div class="font-medium text-gray-900 text-sm leading-tight">${item.name}</div>
+          <div class="text-xs text-gray-500 font-semibold">₹${parseFloat(item.price).toFixed(2)}</div>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button type="button" onclick="updatePosItemQty('${itemId}', -1)" class="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs flex items-center justify-center">-</button>
+          <span class="w-5 text-center text-xs font-semibold text-gray-900" id="pos_qty_${itemId}">${qty}</span>
+          <button type="button" onclick="updatePosItemQty('${itemId}', 1)" class="w-6 h-6 rounded bg-black hover:bg-gray-800 text-white font-bold text-xs flex items-center justify-center">+</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+window.filterPosMenu = function(query) {
+  const q = (query || '').toLowerCase();
+  const filtered = window.cafeMenuItems.filter(i => 
+    i.name.toLowerCase().includes(q) || (i.category && i.category.toLowerCase().includes(q))
+  );
+  renderPosMenuList(filtered);
+};
+
+window.updatePosItemQty = function(itemId, delta) {
+  const item = window.cafeMenuItems.find(i => (i._id || i.id || i.name) === itemId);
+  if (!item) return;
+
+  if (!window.posCart[itemId]) {
+    window.posCart[itemId] = { item, qty: 0 };
+  }
+
+  window.posCart[itemId].qty += delta;
+  if (window.posCart[itemId].qty <= 0) {
+    delete window.posCart[itemId];
+  }
+
+  const qtyEl = document.getElementById(`pos_qty_${itemId}`);
+  if (qtyEl) {
+    qtyEl.innerText = window.posCart[itemId]?.qty || 0;
+  }
+
+  updatePosSummary();
+};
+
+function updatePosSummary() {
+  const cartEntries = Object.values(window.posCart);
+  let totalQty = 0;
+  let totalPrice = 0;
+
+  const listContainer = document.getElementById('posSelectedList');
+  if (cartEntries.length === 0) {
+    listContainer.innerHTML = '<em>No items selected yet.</em>';
+  } else {
+    listContainer.innerHTML = cartEntries.map(({ item, qty }) => {
+      totalQty += qty;
+      const sub = (parseFloat(item.price) || 0) * qty;
+      totalPrice += sub;
+      return `<div class="flex justify-between text-gray-700"><span>${qty}x ${item.name}</span><span>₹${sub.toFixed(2)}</span></div>`;
+    }).join('');
+  }
+
+  document.getElementById('posTotalQty').innerText = totalQty;
+  document.getElementById('posTotalPrice').innerText = totalPrice.toFixed(2);
+  document.getElementById('posBtnPrice').innerText = \`₹\${totalPrice.toFixed(2)}\`;
+}
+
+// 3. Submit Payload matching Backend Schema
+window.submitPosOrder = async function() {
+  const cartEntries = Object.values(window.posCart);
+  if (cartEntries.length === 0) {
+    if (typeof showToast === 'function') showToast('Please select at least 1 menu item', 'error');
+    return;
+  }
+
+  const table = document.getElementById('posTableSelect')?.value || 'Table 1';
+  const customerName = document.getElementById('posCustomerName')?.value?.trim() || 'Walk-in Guest';
+  const customerEmail = document.getElementById('posCustomerEmail')?.value?.trim() || '';
+
+  const items = cartEntries.map(({ item, qty }) => ({
+    name: item.name,
+    price: parseFloat(item.price) || 0,
+    quantity: qty,
+    category: item.category || 'General'
+  }));
+
+  const total = items.reduce((acc, curr) => acc + (curr.price * curr.quantity), 0);
+
+  const payload = {
+    table,
+    customerName,
+    ...(customerEmail ? { customerEmail, email: customerEmail } : {}),
+    items,
+    total,
+    status: 'Preparing',
+    orderStatus: 'PREPARING',
+    paymentStatus: 'UNPAID',
+    paymentMethod: 'PENDING'
+  };
 
   const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
   const token = localStorage.getItem('glitch_admin_token') || localStorage.getItem('token');
 
   try {
-    const res = await fetch(`${apiBase}/orders`, {
+    const res = await fetch(\`\${apiBase}/orders\`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
+        ...(token ? { Authorization: \`Bearer \${token}\` } : {})
       },
-      body: JSON.stringify({
-        table,
-        customerName,
-        items,
-        total,
-        status: 'Preparing',
-        paymentStatus: 'UNPAID'
-      })
+      body: JSON.stringify(payload)
     });
 
     if (res.ok) {
-      if (typeof showToast === 'function') showToast('Manual order punched successfully!', 'success');
+      if (typeof showToast === 'function') showToast('Counter order punched successfully!', 'success');
       closeNewOrderModal();
       if (typeof fetchAllOrders === 'function') fetchAllOrders();
     } else {
-      if (typeof showToast === 'function') showToast('Failed to create order', 'error');
+      const err = await res.json().catch(() => ({}));
+      if (typeof showToast === 'function') showToast(err.message || 'Failed to create order', 'error');
     }
-  } catch (err) {
-    console.error('Manual order error:', err);
-    if (typeof showToast === 'function') showToast('Network error creating order', 'error');
+  } catch (e) {
+    console.error('Order creation error:', e);
+    if (typeof showToast === 'function') showToast('Network error punching order', 'error');
   }
 };
