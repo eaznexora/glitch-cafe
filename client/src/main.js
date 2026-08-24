@@ -1855,198 +1855,128 @@ function renderPosMenuList(items) {
   if (!container) return;
 
   if (!items || items.length === 0) {
-    container.innerHTML = `<div class="col-span-2 text-center py-12 text-sm text-gray-400">No items available in menu.</div>`;
+    container.innerHTML = `<div class="col-span-full text-center py-12 text-sm text-gray-400">No items available in menu.</div>`;
     return;
   }
 
-  container.innerHTML = items.map(item => {
-    const itemId = item._id || item.id || item.name;
-    const hasVariants = Array.isArray(item.variants) && item.variants.length > 0;
-    const hasAddons = (Array.isArray(item.addOns) && item.addOns.length > 0) || (Array.isArray(item.toppings) && item.toppings.length > 0);
-    const hasCustomization = hasVariants || hasAddons;
+  const allCategories = [...new Set(window.cafeMenuItems.map(i => i.category || 'General'))].filter(c => c);
+  
+  const grouped = items.reduce((acc, item) => {
+    const cat = item.category || 'General';
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(item);
+    return acc;
+  }, {});
 
-    const imgUrl = item.image || item.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300&q=80';
-    const isVeg = item.isVeg !== undefined ? item.isVeg : true;
-
-    return `
-      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition overflow-hidden flex flex-col justify-between group">
-        <!-- Card Top: Image + Veg/Non-Veg Tag -->
-        <div class="relative h-28 w-full bg-gray-100 overflow-hidden">
-          <img src="${imgUrl}" alt="${item.name}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" onerror="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300&q=80'">
-          <div class="absolute top-2 left-2 bg-white/90 backdrop-blur-sm p-1 rounded-md shadow-xs">
-            <div class="w-3 h-3 border ${isVeg ? 'border-green-600' : 'border-red-600'} flex items-center justify-center p-0.5">
-              <div class="w-1.5 h-1.5 rounded-full ${isVeg ? 'bg-green-600' : 'bg-red-600'}"></div>
-            </div>
-          </div>
-          <span class="absolute top-2 right-2 bg-black/75 text-white text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-xs">
-            ${item.category || 'General'}
-          </span>
-        </div>
-
-        <!-- Card Body -->
-        <div class="p-3 flex-1 flex flex-col justify-between">
-          <div>
-            <div class="flex justify-between items-start gap-1">
-              <h4 class="font-bold text-gray-900 text-sm leading-snug line-clamp-1">${item.name}</h4>
-              <span class="text-xs font-black text-gray-900 shrink-0">₹${parseFloat(item.price || 0).toFixed(2)}</span>
-            </div>
-            ${item.description ? `<p class="text-[11px] text-gray-400 mt-1 line-clamp-2">${item.description}</p>` : ''}
-          </div>
-
-          <!-- Card Actions -->
-          <div class="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between">
-            <span class="text-[10px] font-semibold text-gray-400">
-              ${hasCustomization ? 'Customizable' : 'Standard'}
-            </span>
-            ${hasCustomization ? `
-              <button type="button" onclick="openItemCustomizer('${itemId}')" class="text-xs font-bold bg-gray-100 hover:bg-black hover:text-white text-gray-900 px-3.5 py-1.5 rounded-xl transition">
-                + Customize
-              </button>
-            ` : `
-              <button type="button" onclick="addDirectItem('${itemId}')" class="text-xs font-bold bg-black hover:bg-gray-800 text-white px-3.5 py-1.5 rounded-xl transition">
-                + Add
-              </button>
-            `}
-          </div>
-        </div>
+  const pillsHtml = `
+    <div class="col-span-full mb-2">
+      <div class="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide" id="posCategoryPills">
+        <button type="button" onclick="filterPosMenu('')" class="px-4 py-1.5 rounded-full text-xs font-bold shrink-0 transition-colors ${!window.currentPosCategory ? 'bg-black text-white shadow-sm' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}">All</button>
+        ${allCategories.map(cat => `
+          <button type="button" onclick="filterPosMenu('${cat}')" class="px-4 py-1.5 rounded-full text-xs font-bold shrink-0 transition-colors ${(window.currentPosCategory === cat) ? 'bg-black text-white shadow-sm' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}">${cat}</button>
+        `).join('')}
       </div>
-    `;
-  }).join('');
-}
-
-window.filterPosMenu = function(query) {
-  const q = (query || '').toLowerCase();
-  const filtered = window.cafeMenuItems.filter(i => 
-    i.name.toLowerCase().includes(q) || (i.category && i.category.toLowerCase().includes(q))
-  );
-  renderPosMenuList(filtered);
-};
-
-// 4. Customization Handler
-let currentCustomizingItem = null;
-let selectedSizeIndex = 0;
-let selectedToppingIndices = new Set();
-let customizeQty = 1;
-
-window.openItemCustomizer = function(itemId) {
-  const item = window.cafeMenuItems.find(i => (i._id || i.id || i.name) === itemId);
-  if (!item) return;
-
-  currentCustomizingItem = item;
-  selectedSizeIndex = 0;
-  selectedToppingIndices.clear();
-  customizeQty = 1;
-
-  const sizes = item.variants || item.sizes || item.portions || [];
-  const toppings = item.toppings || item.addOns || item.addons || [];
-  const isVeg = item.isVeg !== undefined ? item.isVeg : true;
-  const badgeText = item.badge || item.tag || (item.category ? `${item.category.toUpperCase()} SPECIAL` : 'THE GLITCH SPECIAL');
-
-  let modal = document.getElementById('posCustomizeModal');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'posCustomizeModal';
-    modal.className = 'fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150';
-    document.body.appendChild(modal);
-  }
-
-  modal.innerHTML = `
-    <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl relative overflow-hidden text-gray-900 animate-in zoom-in-95 duration-200">
-      
-      <!-- Close Button -->
-      <button onclick="closeCustomizeModal()" class="absolute top-5 right-5 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-black flex items-center justify-center text-lg font-bold transition">&times;</button>
-
-      <!-- Badge -->
-      <div class="inline-flex items-center gap-1.5 bg-black text-white text-[11px] font-bold tracking-widest px-3 py-1 rounded-lg uppercase mb-3">
-        <span>✦</span>
-        <span>${badgeText}</span>
-        <span>✦</span>
-      </div>
-
-      <!-- Item Title & Veg Indicator & Base Price -->
-      <div class="flex items-center justify-between gap-2 border-b border-gray-100 pb-4">
-        <div class="flex items-center gap-2">
-          <h3 class="text-xl font-extrabold text-gray-900 tracking-tight leading-tight">${item.name}</h3>
-          <div class="w-4 h-4 border ${isVeg ? 'border-green-600' : 'border-red-600'} rounded-[3px] flex items-center justify-center p-0.5 shrink-0">
-            <div class="w-2 h-2 rounded-full ${isVeg ? 'bg-green-600' : 'bg-red-600'}"></div>
-          </div>
-        </div>
-        <div class="text-xl font-black text-gray-900 shrink-0" id="customItemHeaderPrice">₹${parseFloat(item.price || 0).toFixed(0)}</div>
-      </div>
-
-      <div class="py-4 space-y-5 max-h-[58vh] overflow-y-auto pr-1">
-        
-        <!-- Select Size Section -->
-        ${sizes.length > 0 ? `
-          <div>
-            <h4 class="text-sm font-bold text-gray-900 mb-2.5">Select Size</h4>
-            <div class="grid grid-cols-3 gap-2.5" id="sizeSelectorGrid">
-              ${sizes.map((s, idx) => {
-                const sName = s.name || s.size || `Option ${idx + 1}`;
-                const sPrice = parseFloat(s.price || item.price || 0).toFixed(0);
-                const isSelected = idx === 0;
-                return `
-                  <button type="button" onclick="setPosCustomSize(${idx})" id="sizeBtn_${idx}" class="size-option-btn p-3 rounded-2xl border-2 transition text-center flex flex-col justify-center items-center ${isSelected ? 'border-black bg-black text-white shadow-sm' : 'border-gray-200 bg-white text-gray-900 hover:border-gray-300'}">
-                    <span class="text-xs font-semibold capitalize">${sName}</span>
-                    <span class="text-sm font-extrabold mt-0.5">₹${sPrice}</span>
-                  </button>
-                `;
-              }).join('')}
-            </div>
-          </div>
-        ` : ''}
-
-        <!-- Select Toppings Section -->
-        ${toppings.length > 0 ? `
-          <div>
-            <h4 class="text-sm font-bold text-gray-900 mb-2.5">Select Toppings</h4>
-            <div class="space-y-2.5">
-              ${toppings.map((t, idx) => {
-                const tPrice = parseFloat(t.price || 0).toFixed(0);
-                return `
-                  <label class="flex items-center justify-between p-3 rounded-2xl border border-gray-200 hover:border-gray-300 bg-white cursor-pointer transition">
-                    <div class="flex items-center gap-3">
-                      <input type="checkbox" onchange="togglePosCustomTopping(${idx}, this.checked)" class="w-4 h-4 rounded border-gray-300 accent-black text-black cursor-pointer">
-                      <span class="text-sm font-medium text-gray-800">${t.name}</span>
-                    </div>
-                    <span class="text-sm font-bold text-gray-900">₹${tPrice}</span>
-                  </label>
-                `;
-              }).join('')}
-            </div>
-          </div>
-        ` : ''}
-
-      </div>
-
-      <!-- Footer Info -->
-      <div class="text-center text-xs text-gray-400 font-medium my-2">
-        Hot & Fresh in 10–15 minutes
-      </div>
-
-      <!-- Action Row: [- 1 +] Pill & Add to Order CTA -->
-      <div class="flex items-center gap-3 pt-2">
-        <!-- Quantity Pill -->
-        <div class="flex items-center justify-between bg-gray-100 rounded-full px-3 py-2 w-28 shrink-0">
-          <button type="button" onclick="changeCustomModalQty(-1)" class="w-6 h-6 rounded-full hover:bg-gray-200 text-gray-700 font-black text-base flex items-center justify-center leading-none select-none">-</button>
-          <span class="font-black text-sm text-gray-900" id="customModalQty">1</span>
-          <button type="button" onclick="changeCustomModalQty(1)" class="w-6 h-6 rounded-full hover:bg-gray-200 text-gray-700 font-black text-base flex items-center justify-center leading-none select-none">+</button>
-        </div>
-
-        <!-- Add to Order Button -->
-        <button type="button" onclick="confirmCustomizedOrder()" class="flex-1 bg-black hover:bg-gray-800 text-white font-bold py-3 px-5 rounded-full text-sm flex items-center justify-center gap-1.5 transition shadow-sm">
-          <span>Add to Order</span>
-          <span>•</span>
-          <span id="customModalFinalBtnPrice">₹0</span>
-        </button>
-      </div>
-
     </div>
   `;
 
-  modal.classList.remove('hidden');
-  updateCustomModalPrices();
+  let cardsHtml = '';
+  
+  for (const [category, catItems] of Object.entries(grouped)) {
+    cardsHtml += `
+      <div class="col-span-full mt-3 mb-1">
+        <h3 class="text-[13px] font-black text-gray-800 uppercase tracking-widest">${category}</h3>
+      </div>
+    `;
+    
+    cardsHtml += catItems.map(item => {
+      const itemId = item._id || item.id || item.name;
+      const hasVariants = Array.isArray(item.variants || item.sizes || item.portions) && (item.variants || item.sizes || item.portions).length > 0;
+      const hasAddons = Array.isArray(item.addOns || item.toppings || item.addons) && (item.addOns || item.toppings || item.addons).length > 0;
+      const hasCustomization = hasVariants || hasAddons;
+      
+      const isVeg = item.isVeg !== undefined ? item.isVeg : true;
+      const badgeText = item.badge || item.tag || (item.category ? `${item.category.toUpperCase()} SPECIAL` : 'THE GLITCH SPECIAL');
+      const isSpecial = badgeText.toUpperCase().includes('SPECIAL') || item.category === 'Signature';
+
+      const cartItems = (window.posCart || []).filter(c => c.id === itemId);
+      let cartQty = 0;
+      if (!hasCustomization) {
+          cartQty = cartItems.reduce((sum, c) => sum + (c.qty || 1), 0);
+      }
+
+      return `
+        <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group h-full gap-3">
+          <div>
+            ${isSpecial ? `
+              <div class="bg-black text-white text-[9.5px] font-extrabold tracking-widest text-center py-1.5 rounded-md uppercase flex items-center justify-center gap-2 select-none w-full mb-3 shadow-xs">
+                <span>✦</span>
+                <span>${badgeText}</span>
+                <span>✦</span>
+              </div>
+            ` : ''}
+
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex items-center gap-2 flex-1 flex-wrap">
+                <h4 class="font-extrabold text-gray-900 text-sm tracking-tight leading-snug">${item.name}</h4>
+                <div class="w-3.5 h-3.5 border ${isVeg ? 'border-green-600' : 'border-red-600'} rounded-[3px] flex items-center justify-center p-0.5 shrink-0" title="${isVeg ? 'Vegetarian' : 'Non-Vegetarian'}">
+                  <div class="w-1.5 h-1.5 rounded-full ${isVeg ? 'bg-green-600' : 'bg-red-600'}"></div>
+                </div>
+              </div>
+              <div class="flex items-center gap-3 shrink-0">
+                <span class="text-sm font-black text-gray-900">₹${parseFloat(item.price || 0).toFixed(0)}</span>
+                
+                ${cartQty > 0 && !hasCustomization ? `
+                  <div class="flex items-center justify-between bg-black text-white rounded-md w-[68px] h-[28px] overflow-hidden shadow-sm">
+                    <button type="button" onclick="changeDirectItemQty('${itemId}', -1)" class="w-1/3 h-full flex items-center justify-center hover:bg-gray-800 font-bold transition text-xs select-none">-</button>
+                    <span class="w-1/3 text-center text-[11px] font-bold select-none cursor-default">${cartQty}</span>
+                    <button type="button" onclick="changeDirectItemQty('${itemId}', 1)" class="w-1/3 h-full flex items-center justify-center hover:bg-gray-800 font-bold transition text-xs select-none">+</button>
+                  </div>
+                ` : `
+                  <button type="button" onclick="${hasCustomization ? `openItemCustomizer('${itemId}')` : `addDirectItem('${itemId}')`}" class="text-[11px] font-bold bg-black hover:bg-gray-800 text-white px-3.5 py-1.5 rounded-md transition shadow-sm cursor-pointer whitespace-nowrap select-none">
+                    + Add
+                  </button>
+                `}
+              </div>
+            </div>
+            
+            ${item.description ? `
+              <div class="w-full border-t border-gray-100 my-3"></div>
+              <p class="text-[11px] text-gray-500 line-clamp-3 leading-relaxed font-normal">${item.description}</p>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  container.innerHTML = pillsHtml + cardsHtml;
+}
+
+window.filterPosMenu = function(query) {
+  const categories = [...new Set(window.cafeMenuItems.map(i => i.category || 'General'))];
+  let filtered;
+  
+  if (categories.includes(query) || query === '') {
+    window.currentPosCategory = query;
+    const searchInput = document.getElementById('posMenuSearch');
+    if (searchInput) searchInput.value = '';
+    
+    if (query === '') {
+      filtered = window.cafeMenuItems;
+    } else {
+      filtered = window.cafeMenuItems.filter(i => (i.category || 'General') === query);
+    }
+  } else {
+    window.currentPosCategory = '';
+    const q = (query || '').toLowerCase();
+    filtered = window.cafeMenuItems.filter(i => 
+      i.name.toLowerCase().includes(q) || (i.category && i.category.toLowerCase().includes(q))
+    );
+  }
+  
+  renderPosMenuList(filtered);
 };
+
 
 window.closeCustomizeModal = function() {
   const modal = document.getElementById('posCustomizeModal');
@@ -2145,6 +2075,25 @@ window.confirmCustomizedOrder = function() {
 
   closeCustomizeModal();
   renderPosCart();
+};
+
+
+window.changeDirectItemQty = function(itemId, delta) {
+  const existingIndex = window.posCart.findIndex(c => c.id === itemId && !c.variant && (!c.toppings || c.toppings.length === 0));
+  if (existingIndex > -1) {
+    window.posCart[existingIndex].qty += delta;
+    if (window.posCart[existingIndex].qty <= 0) {
+      window.posCart.splice(existingIndex, 1);
+    }
+  } else if (delta > 0) {
+    window.addDirectItem(itemId);
+    return;
+  }
+  renderPosCart();
+  const q = document.getElementById('posMenuSearch')?.value;
+  if (q) window.filterPosMenu(q);
+  else if (window.currentPosCategory) window.filterPosMenu(window.currentPosCategory);
+  else renderPosMenuList(window.cafeMenuItems);
 };
 
 window.addDirectItem = function(itemId) {
