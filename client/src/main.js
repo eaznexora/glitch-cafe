@@ -1922,96 +1922,250 @@ window.filterPosMenu = function(query) {
   renderPosMenuList(filtered);
 };
 
-// 4. Inline Customization Handlers
-window.updateInlineQty = function(itemId, delta) {
-  const qtyEl = document.getElementById(`qty_${itemId}`);
-  if (!qtyEl) return;
-  let qty = parseInt(qtyEl.innerText) || 1;
-  qty += delta;
-  if (qty < 1) qty = 1;
-  qtyEl.innerText = qty;
-  updateInlineCardTotal(itemId);
-};
+// 4. Customization Handler
+let currentCustomizingItem = null;
+let selectedSizeIndex = 0;
+let selectedToppingIndices = new Set();
+let customizeQty = 1;
 
-window.updateInlineCardTotal = function(itemId) {
-  const card = document.querySelector(`.pos-item-card[data-id="${itemId}"]`);
-  if (!card) return;
-  
-  let basePrice = parseFloat(card.getAttribute('data-base-price')) || 0;
-  
-  const variantRadio = card.querySelector(`input[name="variant_${itemId}"]:checked`);
-  if (variantRadio) {
-    basePrice = parseFloat(variantRadio.getAttribute('data-price')) || basePrice;
-  }
-  
-  let toppingsTotal = 0;
-  const toppingCheckboxes = card.querySelectorAll(`.pos-topping-${itemId}:checked`);
-  toppingCheckboxes.forEach(cb => {
-    toppingsTotal += parseFloat(cb.getAttribute('data-price')) || 0;
-  });
-  
-  const unitPrice = basePrice + toppingsTotal;
-  const qty = parseInt(document.getElementById(`qty_${itemId}`).innerText) || 1;
-  const finalTotal = unitPrice * qty;
-  
-  const totalEl = document.getElementById(`total_${itemId}`);
-  if (totalEl) totalEl.innerText = `₹${finalTotal.toFixed(0)}`;
-};
-
-window.addInlineItemToCart = function(itemId) {
+window.openItemCustomizer = function(itemId) {
   const item = window.cafeMenuItems.find(i => (i._id || i.id || i.name) === itemId);
   if (!item) return;
 
-  const card = document.querySelector(`.pos-item-card[data-id="${itemId}"]`);
-  if (!card) return;
-  
-  let basePrice = parseFloat(card.getAttribute('data-base-price')) || item.price;
-  let selectedVariantName = null;
-  
-  const variantRadio = card.querySelector(`input[name="variant_${itemId}"]:checked`);
-  if (variantRadio) {
-    basePrice = parseFloat(variantRadio.getAttribute('data-price')) || basePrice;
-    selectedVariantName = variantRadio.getAttribute('data-name');
+  currentCustomizingItem = item;
+  selectedSizeIndex = 0;
+  selectedToppingIndices.clear();
+  customizeQty = 1;
+
+  const sizes = item.variants || item.sizes || item.portions || [];
+  const toppings = item.toppings || item.addOns || item.addons || [];
+  const isVeg = item.isVeg !== undefined ? item.isVeg : true;
+  const badgeText = item.badge || item.tag || (item.category ? `${item.category.toUpperCase()} SPECIAL` : 'THE GLITCH SPECIAL');
+
+  let modal = document.getElementById('posCustomizeModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'posCustomizeModal';
+    modal.className = 'fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150';
+    document.body.appendChild(modal);
   }
-  
+
+  modal.innerHTML = `
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl relative overflow-hidden text-gray-900 animate-in zoom-in-95 duration-200">
+      
+      <!-- Close Button -->
+      <button onclick="closeCustomizeModal()" class="absolute top-5 right-5 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-black flex items-center justify-center text-lg font-bold transition">&times;</button>
+
+      <!-- Badge -->
+      <div class="inline-flex items-center gap-1.5 bg-black text-white text-[11px] font-bold tracking-widest px-3 py-1 rounded-lg uppercase mb-3">
+        <span>✦</span>
+        <span>${badgeText}</span>
+        <span>✦</span>
+      </div>
+
+      <!-- Item Title & Veg Indicator & Base Price -->
+      <div class="flex items-center justify-between gap-2 border-b border-gray-100 pb-4">
+        <div class="flex items-center gap-2">
+          <h3 class="text-xl font-extrabold text-gray-900 tracking-tight leading-tight">${item.name}</h3>
+          <div class="w-4 h-4 border ${isVeg ? 'border-green-600' : 'border-red-600'} rounded-[3px] flex items-center justify-center p-0.5 shrink-0">
+            <div class="w-2 h-2 rounded-full ${isVeg ? 'bg-green-600' : 'bg-red-600'}"></div>
+          </div>
+        </div>
+        <div class="text-xl font-black text-gray-900 shrink-0" id="customItemHeaderPrice">₹${parseFloat(item.price || 0).toFixed(0)}</div>
+      </div>
+
+      <div class="py-4 space-y-5 max-h-[58vh] overflow-y-auto pr-1">
+        
+        <!-- Select Size Section -->
+        ${sizes.length > 0 ? `
+          <div>
+            <h4 class="text-sm font-bold text-gray-900 mb-2.5">Select Size</h4>
+            <div class="grid grid-cols-3 gap-2.5" id="sizeSelectorGrid">
+              ${sizes.map((s, idx) => {
+                const sName = s.name || s.size || `Option ${idx + 1}`;
+                const sPrice = parseFloat(s.price || item.price || 0).toFixed(0);
+                const isSelected = idx === 0;
+                return `
+                  <button type="button" onclick="setPosCustomSize(${idx})" id="sizeBtn_${idx}" class="size-option-btn p-3 rounded-2xl border-2 transition text-center flex flex-col justify-center items-center ${isSelected ? 'border-black bg-black text-white shadow-sm' : 'border-gray-200 bg-white text-gray-900 hover:border-gray-300'}">
+                    <span class="text-xs font-semibold capitalize">${sName}</span>
+                    <span class="text-sm font-extrabold mt-0.5">₹${sPrice}</span>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Select Toppings Section -->
+        ${toppings.length > 0 ? `
+          <div>
+            <h4 class="text-sm font-bold text-gray-900 mb-2.5">Select Toppings</h4>
+            <div class="space-y-2.5">
+              ${toppings.map((t, idx) => {
+                const tPrice = parseFloat(t.price || 0).toFixed(0);
+                return `
+                  <label class="flex items-center justify-between p-3 rounded-2xl border border-gray-200 hover:border-gray-300 bg-white cursor-pointer transition">
+                    <div class="flex items-center gap-3">
+                      <input type="checkbox" onchange="togglePosCustomTopping(${idx}, this.checked)" class="w-4 h-4 rounded border-gray-300 accent-black text-black cursor-pointer">
+                      <span class="text-sm font-medium text-gray-800">${t.name}</span>
+                    </div>
+                    <span class="text-sm font-bold text-gray-900">₹${tPrice}</span>
+                  </label>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+      </div>
+
+      <!-- Footer Info -->
+      <div class="text-center text-xs text-gray-400 font-medium my-2">
+        Hot & Fresh in 10–15 minutes
+      </div>
+
+      <!-- Action Row: [- 1 +] Pill & Add to Order CTA -->
+      <div class="flex items-center gap-3 pt-2">
+        <!-- Quantity Pill -->
+        <div class="flex items-center justify-between bg-gray-100 rounded-full px-3 py-2 w-28 shrink-0">
+          <button type="button" onclick="changeCustomModalQty(-1)" class="w-6 h-6 rounded-full hover:bg-gray-200 text-gray-700 font-black text-base flex items-center justify-center leading-none select-none">-</button>
+          <span class="font-black text-sm text-gray-900" id="customModalQty">1</span>
+          <button type="button" onclick="changeCustomModalQty(1)" class="w-6 h-6 rounded-full hover:bg-gray-200 text-gray-700 font-black text-base flex items-center justify-center leading-none select-none">+</button>
+        </div>
+
+        <!-- Add to Order Button -->
+        <button type="button" onclick="confirmCustomizedOrder()" class="flex-1 bg-black hover:bg-gray-800 text-white font-bold py-3 px-5 rounded-full text-sm flex items-center justify-center gap-1.5 transition shadow-sm">
+          <span>Add to Order</span>
+          <span>•</span>
+          <span id="customModalFinalBtnPrice">₹0</span>
+        </button>
+      </div>
+
+    </div>
+  `;
+
+  modal.classList.remove('hidden');
+  updateCustomModalPrices();
+};
+
+window.closeCustomizeModal = function() {
+  const modal = document.getElementById('posCustomizeModal');
+  if (modal) modal.classList.add('hidden');
+};
+
+window.setPosCustomSize = function(idx) {
+  selectedSizeIndex = idx;
+  const sizes = currentCustomizingItem.variants || currentCustomizingItem.sizes || currentCustomizingItem.portions || [];
+  sizes.forEach((_, i) => {
+    const btn = document.getElementById(`sizeBtn_${i}`);
+    if (btn) {
+      if (i === idx) {
+        btn.className = 'size-option-btn p-3 rounded-2xl border-2 transition text-center flex flex-col justify-center items-center border-black bg-black text-white shadow-sm';
+      } else {
+        btn.className = 'size-option-btn p-3 rounded-2xl border-2 transition text-center flex flex-col justify-center items-center border-gray-200 bg-white text-gray-900 hover:border-gray-300';
+      }
+    }
+  });
+  updateCustomModalPrices();
+};
+
+window.togglePosCustomTopping = function(idx, isChecked) {
+  if (isChecked) {
+    selectedToppingIndices.add(idx);
+  } else {
+    selectedToppingIndices.delete(idx);
+  }
+  updateCustomModalPrices();
+};
+
+window.changeCustomModalQty = function(delta) {
+  customizeQty = Math.max(1, customizeQty + delta);
+  const qtyEl = document.getElementById('customModalQty');
+  if (qtyEl) qtyEl.innerText = customizeQty;
+  updateCustomModalPrices();
+};
+
+function updateCustomModalPrices() {
+  if (!currentCustomizingItem) return;
+
+  const sizes = currentCustomizingItem.variants || currentCustomizingItem.sizes || currentCustomizingItem.portions || [];
+  const toppings = currentCustomizingItem.toppings || currentCustomizingItem.addOns || currentCustomizingItem.addons || [];
+
+  let basePrice = currentCustomizingItem.price || 0;
+  if (sizes.length > 0 && sizes[selectedSizeIndex]) {
+    basePrice = parseFloat(sizes[selectedSizeIndex].price || basePrice);
+  }
+
   let toppingsTotal = 0;
-  const selectedToppings = [];
-  const toppingCheckboxes = card.querySelectorAll(`.pos-topping-${itemId}:checked`);
-  toppingCheckboxes.forEach(cb => {
-    const p = parseFloat(cb.getAttribute('data-price')) || 0;
-    toppingsTotal += p;
-    selectedToppings.push({ name: cb.getAttribute('data-name'), price: p });
+  selectedToppingIndices.forEach(idx => {
+    if (toppings[idx]) {
+      toppingsTotal += parseFloat(toppings[idx].price || 0);
+    }
   });
-  
+
+  const unitTotal = basePrice + toppingsTotal;
+  const grandTotal = unitTotal * customizeQty;
+
+  const headerPriceEl = document.getElementById('customItemHeaderPrice');
+  if (headerPriceEl) headerPriceEl.innerText = `₹${unitTotal.toFixed(0)}`;
+
+  const btnPriceEl = document.getElementById('customModalFinalBtnPrice');
+  if (btnPriceEl) btnPriceEl.innerText = `₹${grandTotal.toFixed(0)}`;
+}
+
+window.confirmCustomizedOrder = function() {
+  if (!currentCustomizingItem) return;
+
+  const sizes = currentCustomizingItem.variants || currentCustomizingItem.sizes || currentCustomizingItem.portions || [];
+  const toppings = currentCustomizingItem.toppings || currentCustomizingItem.addOns || currentCustomizingItem.addons || [];
+
+  const chosenSize = sizes.length > 0 ? (sizes[selectedSizeIndex]?.name || sizes[selectedSizeIndex]?.size || 'Regular') : null;
+  const basePrice = sizes.length > 0 ? parseFloat(sizes[selectedSizeIndex]?.price || currentCustomizingItem.price) : parseFloat(currentCustomizingItem.price);
+
+  const chosenToppings = [];
+  let toppingsTotal = 0;
+  selectedToppingIndices.forEach(idx => {
+    if (toppings[idx]) {
+      chosenToppings.push(toppings[idx]);
+      toppingsTotal += parseFloat(toppings[idx].price || 0);
+    }
+  });
+
   const unitPrice = basePrice + toppingsTotal;
-  const qty = parseInt(document.getElementById(`qty_${itemId}`).innerText) || 1;
-  
-  document.getElementById(`qty_${itemId}`).innerText = '1';
-  
-  const existingIndex = window.posCart.findIndex(c => {
-    if (c.id !== itemId || c.variant !== selectedVariantName || c.toppings.length !== selectedToppings.length) return false;
-    const tNames1 = c.toppings.map(t=>t.name).sort().join(',');
-    const tNames2 = selectedToppings.map(t=>t.name).sort().join(',');
-    return tNames1 === tNames2;
+
+  window.posCart.push({
+    id: currentCustomizingItem._id || currentCustomizingItem.id || currentCustomizingItem.name,
+    name: currentCustomizingItem.name,
+    variant: chosenSize,
+    toppings: chosenToppings,
+    price: unitPrice,
+    category: currentCustomizingItem.category || 'General',
+    qty: customizeQty
   });
-  
-  if (existingIndex > -1) {
-    window.posCart[existingIndex].qty += qty;
+
+  closeCustomizeModal();
+  renderPosCart();
+};
+
+window.addDirectItem = function(itemId) {
+  const item = window.cafeMenuItems.find(i => (i._id || i.id || i.name) === itemId);
+  if (!item) return;
+
+  const existing = window.posCart.find(c => c.id === itemId && !c.variant && c.toppings.length === 0);
+  if (existing) {
+    existing.qty += 1;
   } else {
     window.posCart.push({
       id: itemId,
       name: item.name,
-      variant: selectedVariantName,
-      toppings: selectedToppings,
-      price: unitPrice,
+      variant: null,
+      toppings: [],
+      price: item.price,
       category: item.category || 'General',
-      qty: qty
+      qty: 1
     });
   }
-  
   renderPosCart();
-  if (typeof showToast === 'function') showToast(`Added ${qty}x ${item.name} to order`, 'success');
-  updateInlineCardTotal(itemId);
 };
 
 window.changeCartQty = function(index, delta) {
