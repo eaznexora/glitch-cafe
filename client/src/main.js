@@ -1428,7 +1428,7 @@ window.generateReceiptPDF = function() {
     contactNumber: '+91 98765 43210',
     taxId: '22AAAAA0000A1Z5',
     currencySymbol: '₹',
-    invoiceFooter: 'THANK YOU. VISIT AGAIN.\nTHANK YOU'
+    invoiceFooter: 'THANK YOU. VISIT AGAIN.nTHANK YOU'
   };
 
   const stored = localStorage.getItem('cafe_settings') || localStorage.getItem('glitch_cafe_profile');
@@ -1922,131 +1922,96 @@ window.filterPosMenu = function(query) {
   renderPosMenuList(filtered);
 };
 
-// 4. Customization Handler
-let currentCustomizingItem = null;
-let selectedVariant = null;
-let selectedToppings = [];
-
-window.openItemCustomizer = function(itemId) {
-  const item = window.cafeMenuItems.find(i => (i._id || i.id || i.name) === itemId);
-  if (!item) return;
-
-  currentCustomizingItem = item;
-  const variants = item.variants || [];
-  const addOns = item.addOns || item.toppings || [];
-
-  selectedVariant = variants.length > 0 ? variants[0] : null;
-  selectedToppings = [];
-
-  document.getElementById('customItemTitle').innerText = item.name;
-  document.getElementById('customItemBasePrice').innerText = `Base: ₹${parseFloat(item.price || 0).toFixed(2)}`;
-
-  // Populate Real Variants
-  const varBox = document.getElementById('variantsSection');
-  const varCont = document.getElementById('variantsContainer');
-  if (variants.length > 0) {
-    varBox.classList.remove('hidden');
-    varCont.innerHTML = variants.map((v, idx) => `
-      <label class="flex items-center justify-between p-2.5 border rounded-xl cursor-pointer hover:bg-gray-50 text-xs font-medium ${idx === 0 ? 'border-black bg-gray-50' : 'border-gray-200'}">
-        <input type="radio" name="itemVariantRadio" value="${idx}" onchange="selectPosVariant(${idx})" ${idx === 0 ? 'checked' : ''} class="accent-black mr-2">
-        <span class="flex-1">${v.name || v.size || 'Standard'}</span>
-        <span class="font-bold">₹${parseFloat(v.price || item.price).toFixed(2)}</span>
-      </label>
-    `).join('');
-  } else {
-    varBox.classList.add('hidden');
-  }
-
-  // Populate Real Add-ons
-  const topBox = document.getElementById('toppingsSection');
-  const topCont = document.getElementById('toppingsContainer');
-  if (addOns.length > 0) {
-    topBox.classList.remove('hidden');
-    topCont.innerHTML = addOns.map((t, idx) => `
-      <label class="flex items-center justify-between p-2 rounded-lg hover:bg-white cursor-pointer text-xs">
-        <div class="flex items-center gap-2">
-          <input type="checkbox" onchange="togglePosTopping(${idx}, this.checked)" class="accent-black rounded">
-          <span class="text-gray-800 font-medium">${t.name}</span>
-        </div>
-        <span class="font-bold text-gray-700">+₹${parseFloat(t.price || 0).toFixed(2)}</span>
-      </label>
-    `).join('');
-  } else {
-    topBox.classList.add('hidden');
-  }
-
-  updateCustomModalTotal();
-  document.getElementById('posCustomizeModal').classList.remove('hidden');
+// 4. Inline Customization Handlers
+window.updateInlineQty = function(itemId, delta) {
+  const qtyEl = document.getElementById(`qty_${itemId}`);
+  if (!qtyEl) return;
+  let qty = parseInt(qtyEl.innerText) || 1;
+  qty += delta;
+  if (qty < 1) qty = 1;
+  qtyEl.innerText = qty;
+  updateInlineCardTotal(itemId);
 };
 
-window.closeCustomizeModal = function() {
-  document.getElementById('posCustomizeModal').classList.add('hidden');
-};
-
-window.selectPosVariant = function(idx) {
-  if (currentCustomizingItem && currentCustomizingItem.variants) {
-    selectedVariant = currentCustomizingItem.variants[idx];
-    updateCustomModalTotal();
+window.updateInlineCardTotal = function(itemId) {
+  const card = document.querySelector(`.pos-item-card[data-id="${itemId}"]`);
+  if (!card) return;
+  
+  let basePrice = parseFloat(card.getAttribute('data-base-price')) || 0;
+  
+  const variantRadio = card.querySelector(`input[name="variant_${itemId}"]:checked`);
+  if (variantRadio) {
+    basePrice = parseFloat(variantRadio.getAttribute('data-price')) || basePrice;
   }
-};
-
-window.togglePosTopping = function(idx, checked) {
-  if (!currentCustomizingItem || !currentCustomizingItem.toppings) return;
-  const topping = currentCustomizingItem.toppings[idx];
-  if (checked) {
-    selectedToppings.push(topping);
-  } else {
-    selectedToppings = selectedToppings.filter(t => t.name !== topping.name);
-  }
-  updateCustomModalTotal();
-};
-
-function updateCustomModalTotal() {
-  let base = selectedVariant ? selectedVariant.price : (currentCustomizingItem ? currentCustomizingItem.price : 0);
-  let toppingsTotal = selectedToppings.reduce((s, t) => s + (t.price || 0), 0);
-  document.getElementById('customModalTotal').innerText = `₹${(base + toppingsTotal).toFixed(2)}`;
-}
-
-window.confirmCustomizedItem = function() {
-  if (!currentCustomizingItem) return;
-
-  const basePrice = selectedVariant ? selectedVariant.price : currentCustomizingItem.price;
-  const toppingsPrice = selectedToppings.reduce((s, t) => s + (t.price || 0), 0);
-  const finalUnitPrice = basePrice + toppingsPrice;
-
-  window.posCart.push({
-    id: currentCustomizingItem._id || currentCustomizingItem.id || currentCustomizingItem.name,
-    name: currentCustomizingItem.name,
-    variant: selectedVariant ? selectedVariant.name : null,
-    toppings: [...selectedToppings],
-    price: finalUnitPrice,
-    category: currentCustomizingItem.category || 'General',
-    qty: 1
+  
+  let toppingsTotal = 0;
+  const toppingCheckboxes = card.querySelectorAll(`.pos-topping-${itemId}:checked`);
+  toppingCheckboxes.forEach(cb => {
+    toppingsTotal += parseFloat(cb.getAttribute('data-price')) || 0;
   });
-
-  closeCustomizeModal();
-  renderPosCart();
+  
+  const unitPrice = basePrice + toppingsTotal;
+  const qty = parseInt(document.getElementById(`qty_${itemId}`).innerText) || 1;
+  const finalTotal = unitPrice * qty;
+  
+  const totalEl = document.getElementById(`total_${itemId}`);
+  if (totalEl) totalEl.innerText = `₹${finalTotal.toFixed(0)}`;
 };
 
-window.addDirectItem = function(itemId) {
+window.addInlineItemToCart = function(itemId) {
   const item = window.cafeMenuItems.find(i => (i._id || i.id || i.name) === itemId);
   if (!item) return;
 
-  const existing = window.posCart.find(c => c.id === itemId && !c.variant && c.toppings.length === 0);
-  if (existing) {
-    existing.qty += 1;
+  const card = document.querySelector(`.pos-item-card[data-id="${itemId}"]`);
+  if (!card) return;
+  
+  let basePrice = parseFloat(card.getAttribute('data-base-price')) || item.price;
+  let selectedVariantName = null;
+  
+  const variantRadio = card.querySelector(`input[name="variant_${itemId}"]:checked`);
+  if (variantRadio) {
+    basePrice = parseFloat(variantRadio.getAttribute('data-price')) || basePrice;
+    selectedVariantName = variantRadio.getAttribute('data-name');
+  }
+  
+  let toppingsTotal = 0;
+  const selectedToppings = [];
+  const toppingCheckboxes = card.querySelectorAll(`.pos-topping-${itemId}:checked`);
+  toppingCheckboxes.forEach(cb => {
+    const p = parseFloat(cb.getAttribute('data-price')) || 0;
+    toppingsTotal += p;
+    selectedToppings.push({ name: cb.getAttribute('data-name'), price: p });
+  });
+  
+  const unitPrice = basePrice + toppingsTotal;
+  const qty = parseInt(document.getElementById(`qty_${itemId}`).innerText) || 1;
+  
+  document.getElementById(`qty_${itemId}`).innerText = '1';
+  
+  const existingIndex = window.posCart.findIndex(c => {
+    if (c.id !== itemId || c.variant !== selectedVariantName || c.toppings.length !== selectedToppings.length) return false;
+    const tNames1 = c.toppings.map(t=>t.name).sort().join(',');
+    const tNames2 = selectedToppings.map(t=>t.name).sort().join(',');
+    return tNames1 === tNames2;
+  });
+  
+  if (existingIndex > -1) {
+    window.posCart[existingIndex].qty += qty;
   } else {
     window.posCart.push({
       id: itemId,
       name: item.name,
-      variant: null,
-      toppings: [],
-      price: item.price,
+      variant: selectedVariantName,
+      toppings: selectedToppings,
+      price: unitPrice,
       category: item.category || 'General',
-      qty: 1
+      qty: qty
     });
   }
+  
   renderPosCart();
+  if (typeof showToast === 'function') showToast(`Added ${qty}x ${item.name} to order`, 'success');
+  updateInlineCardTotal(itemId);
 };
 
 window.changeCartQty = function(index, delta) {
