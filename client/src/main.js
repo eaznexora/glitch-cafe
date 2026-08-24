@@ -1716,267 +1716,283 @@ window.closeNewOrderModal = function() {
 
 // 3. Load & Render Menu with Rich Variants
 async function loadPosMenuItems() {
-  const container = document.getElementById('posMenuContainer');
-  if (container) {
-    container.innerHTML = `<div class="col-span-2 text-center py-12 text-sm text-gray-400">Loading catalog...</div>`;
-  }
+  const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
+  const token = localStorage.getItem('glitch_admin_token') || localStorage.getItem('token');
 
-  // 1. Check existing window variables from the user storefront
-  if (window.allMenuItems && window.allMenuItems.length > 0) {
-    window.cafeMenuItems = window.allMenuItems;
-    renderPosMenuList(window.cafeMenuItems);
-    return;
-  }
-  if (window.menuItems && window.menuItems.length > 0) {
-    window.cafeMenuItems = window.menuItems;
-    renderPosMenuList(window.cafeMenuItems);
-    return;
-  }
+  let items = [];
 
-  // 2. Check localStorage caches
-  const localMenu = localStorage.getItem('cafe_menu') || localStorage.getItem('menu_items') || localStorage.getItem('glitch_menu');
-  if (localMenu) {
+  // 1. Direct API fetch attempts
+  const endpoints = [`${apiBase}/menu`, `${apiBase}/products`, `${apiBase}/items`, `${apiBase}/menu-items`];
+  for (const ep of endpoints) {
     try {
-      const parsed = JSON.parse(localMenu);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        window.cafeMenuItems = parsed;
-        renderPosMenuList(window.cafeMenuItems);
-        return;
+      const res = await fetch(ep, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const extracted = data.data || data.items || data.menu || (Array.isArray(data) ? data : null);
+        if (Array.isArray(extracted) && extracted.length > 0) {
+          items = extracted;
+          break;
+        }
       }
     } catch (e) {}
   }
 
-  // 3. Probe common backend endpoints
-  const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
-  const token = localStorage.getItem('glitch_admin_token') || localStorage.getItem('token');
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-  const candidateEndpoints = [
-    `${apiBase}/products`,
-    `${apiBase}/menu-items`,
-    `${apiBase}/items`,
-    `${apiBase}/menu`,
-    './data/menu.json',
-    '../data/menu.json'
-  ];
-
-  for (const url of candidateEndpoints) {
-    try {
-      const res = await fetch(url, { headers });
-      if (res.ok) {
-        const json = await res.json();
-        const items = json.data || json.items || json.products || (Array.isArray(json) ? json : null);
-        if (Array.isArray(items) && items.length > 0) {
-          window.cafeMenuItems = items;
-          renderPosMenuList(window.cafeMenuItems);
-          return;
-        }
-      }
-    } catch (err) {
-      // Continue to next candidate
+  // 2. Fallback to storage or global variables
+  if (!items || items.length === 0) {
+    const cached = localStorage.getItem('glitch_menu') || localStorage.getItem('cafe_menu') || localStorage.getItem('menu_items') || localStorage.getItem('menu');
+    if (cached) {
+      try { items = JSON.parse(cached); } catch (e) {}
     }
   }
 
-  // 4. Default Full Cafe Menu with real variants and toppings (ensures UI is never blank)
-  window.cafeMenuItems = [
-    {
-      id: 'item-1',
-      name: 'Cheese Fries',
-      category: 'Fries',
-      price: 150,
-      description: 'Crispy golden fries loaded with signature melted cheese blend and herbs.',
-      image: 'https://images.unsplash.com/photo-1585109649139-366815a0d713?w=500&q=80',
-      isVeg: true,
-      variants: [{ name: 'Regular', price: 150 }, { name: 'Large', price: 210 }],
-      addOns: [{ name: 'Extra Cheese Blend', price: 30 }, { name: 'Peri-Peri Seasoning', price: 15 }, { name: 'Jalapeno Dip', price: 25 }]
-    },
-    {
-      id: 'item-2',
-      name: 'Piri Piri Fries',
-      category: 'Fries',
-      price: 110,
-      description: 'Tossed in fiery African bird’s eye chili spice mix.',
-      image: 'https://images.unsplash.com/photo-1576107232684-1279f3908594?w=500&q=80',
-      isVeg: true,
-      variants: [{ name: 'Regular', price: 110 }, { name: 'Large', price: 160 }],
-      addOns: [{ name: 'Mayo Dip', price: 15 }, { name: 'Cheese Dip', price: 25 }]
-    },
-    {
-      id: 'item-3',
-      name: 'Steamed Momo',
-      category: 'Momos',
-      price: 140,
-      description: 'Handcrafted dumplings filled with seasoned garden vegetables, served with red chili chutney.',
-      image: 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=500&q=80',
-      isVeg: true,
-      variants: [{ name: '6 Pcs', price: 140 }, { name: '10 Pcs', price: 200 }],
-      addOns: [{ name: 'Extra Schezwan Chutney', price: 20 }, { name: 'Tossed in Fried Chili', price: 30 }]
-    },
-    {
-      id: 'item-4',
-      name: 'Margherita Pizza',
-      category: 'Pizza',
-      price: 180,
-      description: 'Classic Napoli style crust, crushed tomato sauce, fresh basil, and mozzarella.',
-      image: 'https://images.unsplash.com/photo-1604382355076-af4b0eb60143?w=500&q=80',
-      isVeg: true,
-      variants: [{ name: '7" Personal', price: 180 }, { name: '10" Medium', price: 280 }],
-      addOns: [{ name: 'Extra Mozzarella', price: 40 }, { name: 'Black Olives & Jalapenos', price: 30 }, { name: 'Garlic Crust', price: 20 }]
-    },
-    {
-      id: 'item-5',
-      name: 'Cold Coffee',
-      category: 'Beverages',
-      price: 80,
-      description: 'Rich blended espresso, chilled whole milk, and chocolate drizzle.',
-      image: 'https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=500&q=80',
-      isVeg: true,
-      variants: [{ name: 'Regular (300ml)', price: 80 }, { name: 'Large (500ml)', price: 120 }],
-      addOns: [{ name: 'Vanilla Ice Cream Scoop', price: 30 }, { name: 'Hazelnut Syrup', price: 25 }, { name: 'Extra Espresso Shot', price: 25 }]
-    },
-    {
-      id: 'item-6',
-      name: 'Cheese Maggi',
-      category: 'Maggi',
-      price: 100,
-      description: 'Classic comfort Maggi noodles smothered in creamy cheese and mild spices.',
-      image: 'https://images.unsplash.com/photo-1612927601601-6638404737ce?w=500&q=80',
-      isVeg: true,
-      variants: [{ name: 'Single Bowl', price: 100 }, { name: 'Double Maggi', price: 150 }],
-      addOns: [{ name: 'Double Cheese Cube', price: 30 }, { name: 'Butter Tadka', price: 20 }, { name: 'Sweet Corn', price: 20 }]
-    }
-  ];
+  if (!items || items.length === 0) {
+    if (window.allMenuItems && window.allMenuItems.length > 0) items = window.allMenuItems;
+  }
 
-  renderPosMenuList(window.cafeMenuItems);
+  window.cafeMenuItems = items || [];
+  renderPosCategories();
+  renderPosCatalog();
 }
 
-function renderPosMenuList(items) {
+window.activePosCategory = 'All Items';
+
+function renderPosCategories() {
+  const bar = document.getElementById('posCategoriesBar');
+  if (!bar) return;
+
+  const categories = ['All Items'];
+  (window.cafeMenuItems || []).forEach(item => {
+    const cat = (item.category || item.categoryName || '').trim();
+    if (cat && !categories.some(c => c.toLowerCase() === cat.toLowerCase())) {
+      categories.push(cat);
+    }
+  });
+
+  bar.innerHTML = categories.map(cat => {
+    const isActive = cat.toLowerCase() === window.activePosCategory.toLowerCase();
+    return `
+      <button type="button" onclick="selectPosCategory('${cat}')" class="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition shrink-0 ${
+        isActive 
+          ? 'bg-black text-white shadow-xs' 
+          : 'bg-white border border-gray-200 text-gray-800 hover:border-gray-400'
+      }">
+        ${cat}
+      </button>
+    `;
+  }).join('');
+}
+
+window.selectPosCategory = function(cat) {
+  window.activePosCategory = cat;
+  renderPosCategories();
+  renderPosCatalog();
+};
+
+function renderPosCatalog() {
   const container = document.getElementById('posMenuContainer');
   if (!container) return;
 
-  if (!items || items.length === 0) {
-    container.innerHTML = `<div class="col-span-full text-center py-12 text-sm text-gray-400">No items available in menu.</div>`;
+  const search = (document.getElementById('posMenuSearch')?.value || '').toLowerCase().trim();
+  
+  const filtered = (window.cafeMenuItems || []).filter(item => {
+    const cat = (item.category || item.categoryName || '').toLowerCase();
+    const matchesCat = window.activePosCategory === 'All Items' || cat === window.activePosCategory.toLowerCase();
+    const matchesSearch = !search || item.name.toLowerCase().includes(search) || (item.description && item.description.toLowerCase().includes(search));
+    return matchesCat && matchesSearch;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = `<div class="col-span-2 text-center py-16 text-sm text-gray-400 font-medium">No items found.</div>`;
     return;
   }
 
-  const allCategories = [...new Set(window.cafeMenuItems.map(i => i.category || 'General'))].filter(c => c);
-  
-  const grouped = items.reduce((acc, item) => {
-    const cat = item.category || 'General';
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(item);
-    return acc;
-  }, {});
+  // Group by category if "All Items" is selected
+  container.innerHTML = filtered.map(item => {
+    const itemId = item._id || item.id || item.name;
+    const isSpecial = item.isSpecial === true || item.isGlitchSpecial === true || item.badge === 'THE GLITCH SPECIAL' || item.tag === 'special' || (item.tags && item.tags.includes('special'));
+    const isVeg = item.isVeg !== undefined ? item.isVeg : true;
 
-  const pillsHtml = `
-    <div class="col-span-full mb-2">
-      <div class="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide" id="posCategoryPills">
-        <button type="button" onclick="filterPosMenu('')" class="px-4 py-1.5 rounded-full text-xs font-bold shrink-0 transition-colors ${!window.currentPosCategory ? 'bg-black text-white shadow-sm' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}">All</button>
-        ${allCategories.map(cat => `
-          <button type="button" onclick="filterPosMenu('${cat}')" class="px-4 py-1.5 rounded-full text-xs font-bold shrink-0 transition-colors ${(window.currentPosCategory === cat) ? 'bg-black text-white shadow-sm' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}">${cat}</button>
-        `).join('')}
-      </div>
-    </div>
-  `;
-
-  let cardsHtml = '';
-  
-  for (const [category, catItems] of Object.entries(grouped)) {
-    cardsHtml += `
-      <div class="col-span-full mt-3 mb-1">
-        <h3 class="text-[13px] font-black text-gray-800 uppercase tracking-widest">${category}</h3>
-      </div>
-    `;
-    
-    cardsHtml += catItems.map(item => {
-      const itemId = item._id || item.id || item.name;
-      const hasVariants = Array.isArray(item.variants || item.sizes || item.portions) && (item.variants || item.sizes || item.portions).length > 0;
-      const hasAddons = Array.isArray(item.addOns || item.toppings || item.addons) && (item.addOns || item.toppings || item.addons).length > 0;
-      const hasCustomization = hasVariants || hasAddons;
-      
-      const isVeg = item.isVeg !== undefined ? item.isVeg : true;
-      const badgeText = item.badge || item.tag || (item.category ? `${item.category.toUpperCase()} SPECIAL` : 'THE GLITCH SPECIAL');
-      const isSpecial = badgeText.toUpperCase().includes('SPECIAL') || item.category === 'Signature';
-
-      const cartItems = (window.posCart || []).filter(c => c.id === itemId);
-      let cartQty = 0;
-      if (!hasCustomization) {
-          cartQty = cartItems.reduce((sum, c) => sum + (c.qty || 1), 0);
-      }
-
-      return `
-        <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group h-full gap-3">
-          <div>
-            ${isSpecial ? `
-              <div class="bg-black text-white text-[9.5px] font-extrabold tracking-widest text-center py-1.5 rounded-md uppercase flex items-center justify-center gap-2 select-none w-full mb-3 shadow-xs">
+    return `
+      <div class="bg-white rounded-3xl border border-gray-200 p-5 shadow-xs hover:shadow-md transition flex flex-col justify-between relative">
+        <div>
+          <!-- THE GLITCH SPECIAL BANNER (Only for tagged items) -->
+          ${isSpecial ? `
+            <div class="mb-3">
+              <div class="inline-flex items-center justify-center gap-2 bg-black text-white text-[11px] font-black tracking-widest px-4 py-1.5 rounded-xl uppercase shadow-xs">
                 <span>✦</span>
-                <span>${badgeText}</span>
+                <span>THE GLITCH SPECIAL</span>
                 <span>✦</span>
               </div>
-            ` : ''}
+            </div>
+          ` : ''}
 
-            <div class="flex items-start justify-between gap-2">
-              <div class="flex items-center gap-2 flex-1 flex-wrap">
-                <h4 class="font-extrabold text-gray-900 text-sm tracking-tight leading-snug">${item.name}</h4>
-                <div class="w-3.5 h-3.5 border ${isVeg ? 'border-green-600' : 'border-red-600'} rounded-[3px] flex items-center justify-center p-0.5 shrink-0" title="${isVeg ? 'Vegetarian' : 'Non-Vegetarian'}">
-                  <div class="w-1.5 h-1.5 rounded-full ${isVeg ? 'bg-green-600' : 'bg-red-600'}"></div>
-                </div>
-              </div>
-              <div class="flex items-center gap-3 shrink-0">
-                <span class="text-sm font-black text-gray-900">₹${parseFloat(item.price || 0).toFixed(0)}</span>
-                
-                ${cartQty > 0 && !hasCustomization ? `
-                  <div class="flex items-center justify-between bg-black text-white rounded-md w-[68px] h-[28px] overflow-hidden shadow-sm">
-                    <button type="button" onclick="changeDirectItemQty('${itemId}', -1)" class="w-1/3 h-full flex items-center justify-center hover:bg-gray-800 font-bold transition text-xs select-none">-</button>
-                    <span class="w-1/3 text-center text-[11px] font-bold select-none cursor-default">${cartQty}</span>
-                    <button type="button" onclick="changeDirectItemQty('${itemId}', 1)" class="w-1/3 h-full flex items-center justify-center hover:bg-gray-800 font-bold transition text-xs select-none">+</button>
-                  </div>
-                ` : `
-                  <button type="button" onclick="${hasCustomization ? `openItemCustomizer('${itemId}')` : `addDirectItem('${itemId}')`}" class="text-[11px] font-bold bg-black hover:bg-gray-800 text-white px-3.5 py-1.5 rounded-md transition shadow-sm cursor-pointer whitespace-nowrap select-none">
-                    + Add
-                  </button>
-                `}
+          <!-- Header: Title + Veg Box + Price + Add Button -->
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <h4 class="font-extrabold text-gray-900 text-lg tracking-tight">${item.name}</h4>
+              <div class="w-4 h-4 border ${isVeg ? 'border-green-600' : 'border-red-600'} rounded-[3px] flex items-center justify-center p-0.5 shrink-0">
+                <div class="w-2 h-2 rounded-full ${isVeg ? 'bg-green-600' : 'bg-red-600'}"></div>
               </div>
             </div>
             
-            ${item.description ? `
-              <div class="w-full border-t border-gray-100 my-3"></div>
-              <p class="text-[11px] text-gray-500 line-clamp-3 leading-relaxed font-normal">${item.description}</p>
-            ` : ''}
+            <div class="flex items-center gap-3 shrink-0">
+              <span class="text-lg font-black text-gray-900">₹${parseFloat(item.price || 0).toFixed(0)}</span>
+              <button type="button" onclick="window.handleItemAddClick('${itemId}')" class="bg-black hover:bg-gray-800 text-white font-extrabold text-xs px-4 py-2 rounded-xl transition shadow-xs cursor-pointer flex items-center gap-1">
+                <span>+</span> Add
+              </button>
+            </div>
           </div>
-        </div>
-      `;
-    }).join('');
-  }
 
-  container.innerHTML = pillsHtml + cardsHtml;
+          <!-- Description -->
+          ${item.description ? `<p class="text-xs text-gray-400 mt-2 line-clamp-2 font-medium">${item.description}</p>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
-window.filterPosMenu = function(query) {
-  const categories = [...new Set(window.cafeMenuItems.map(i => i.category || 'General'))];
-  let filtered;
-  
-  if (categories.includes(query) || query === '') {
-    window.currentPosCategory = query;
-    const searchInput = document.getElementById('posMenuSearch');
-    if (searchInput) searchInput.value = '';
-    
-    if (query === '') {
-      filtered = window.cafeMenuItems;
-    } else {
-      filtered = window.cafeMenuItems.filter(i => (i.category || 'General') === query);
-    }
-  } else {
-    window.currentPosCategory = '';
-    const q = (query || '').toLowerCase();
-    filtered = window.cafeMenuItems.filter(i => 
-      i.name.toLowerCase().includes(q) || (i.category && i.category.toLowerCase().includes(q))
-    );
+window.handleItemAddClick = function(itemId) {
+  const item = (window.cafeMenuItems || []).find(i => (i._id || i.id || i.name) === itemId);
+  if (!item) return;
+
+  const sizes = item.variants || item.sizes || item.portions || [];
+  const toppings = item.toppings || item.addOns || item.addons || [];
+
+  // If item has no variants and no toppings, add directly to ticket
+  if (sizes.length === 0 && toppings.length === 0) {
+    window.addDirectItem(itemId);
+    return;
   }
-  
-  renderPosMenuList(filtered);
+
+  // Otherwise, open the customer-style modal
+  window.openItemCustomizer(itemId);
 };
 
+window.openItemCustomizer = function(itemId) {
+  const item = (window.cafeMenuItems || []).find(i => (i._id || i.id || i.name) === itemId);
+  if (!item) return;
+
+  currentCustomizingItem = item;
+  selectedSizeIndex = 0;
+  selectedToppingIndices.clear();
+  customizeQty = 1;
+
+  const sizes = item.variants || item.sizes || item.portions || [];
+  const toppings = item.toppings || item.addOns || item.addons || [];
+  const isSpecial = item.isSpecial === true || item.isGlitchSpecial === true || item.badge === 'THE GLITCH SPECIAL' || item.tag === 'special';
+  const isVeg = item.isVeg !== undefined ? item.isVeg : true;
+
+  let modal = document.getElementById('posCustomizeModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'posCustomizeModal';
+    modal.className = 'fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150';
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = `
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl relative overflow-hidden text-gray-900 animate-in zoom-in-95 duration-200">
+      
+      <!-- Close Button -->
+      <button onclick="closeCustomizeModal()" class="absolute top-5 right-5 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-black flex items-center justify-center text-lg font-bold transition">&times;</button>
+
+      <!-- Badge (If special) -->
+      ${isSpecial ? `
+        <div class="inline-flex items-center gap-1.5 bg-black text-white text-[11px] font-black tracking-widest px-3 py-1.5 rounded-xl uppercase mb-3 select-none">
+          <span>✦</span>
+          <span>THE GLITCH SPECIAL</span>
+          <span>✦</span>
+        </div>
+      ` : ''}
+
+      <!-- Item Title & Veg Indicator & Base Price -->
+      <div class="flex items-center justify-between gap-2 border-b border-gray-100 pb-4 ${!isSpecial ? 'pt-2' : ''}">
+        <div class="flex items-center gap-2">
+          <h3 class="text-2xl font-black text-gray-900 tracking-tight leading-tight">${item.name}</h3>
+          <div class="w-4 h-4 border ${isVeg ? 'border-green-600' : 'border-red-600'} rounded-[3px] flex items-center justify-center p-0.5 shrink-0">
+            <div class="w-2 h-2 rounded-full ${isVeg ? 'bg-green-600' : 'bg-red-600'}"></div>
+          </div>
+        </div>
+        <div class="text-2xl font-black text-gray-900 shrink-0" id="customItemHeaderPrice">₹${parseFloat(item.price || 0).toFixed(0)}</div>
+      </div>
+
+      <div class="py-4 space-y-5 max-h-[58vh] overflow-y-auto pr-1">
+        
+        <!-- Select Size Section -->
+        ${sizes.length > 0 ? `
+          <div>
+            <h4 class="text-sm font-bold text-gray-900 mb-3">Select Size</h4>
+            <div class="grid grid-cols-3 gap-2.5">
+              ${sizes.map((s, idx) => {
+                const sName = s.name || s.size || `Option ${idx + 1}`;
+                const sPrice = parseFloat(s.price || item.price || 0).toFixed(0);
+                const isSelected = idx === 0;
+                return `
+                  <button type="button" onclick="setPosCustomSize(${idx})" id="sizeBtn_${idx}" class="p-3.5 rounded-2xl border-2 transition text-center flex flex-col justify-center items-center ${
+                    isSelected 
+                      ? 'border-black bg-black text-white shadow-sm' 
+                      : 'border-gray-200 bg-white text-gray-900 hover:border-gray-300'
+                  }">
+                    <span class="text-xs font-bold lowercase">${sName}</span>
+                    <span class="text-base font-black mt-0.5">₹${sPrice}</span>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Select Toppings Section -->
+        ${toppings.length > 0 ? `
+          <div>
+            <h4 class="text-sm font-bold text-gray-900 mb-3">Select Toppings</h4>
+            <div class="space-y-2">
+              ${toppings.map((t, idx) => {
+                const tPrice = parseFloat(t.price || 0).toFixed(0);
+                return `
+                  <label class="flex items-center justify-between p-3.5 rounded-2xl border border-gray-200 hover:border-gray-300 bg-white cursor-pointer transition">
+                    <div class="flex items-center gap-3">
+                      <input type="checkbox" onchange="togglePosCustomTopping(${idx}, this.checked)" class="w-4 h-4 rounded border-gray-300 accent-black text-black cursor-pointer">
+                      <span class="text-sm font-semibold text-gray-800">${t.name}</span>
+                    </div>
+                    <span class="text-sm font-black text-gray-900">₹${tPrice}</span>
+                  </label>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+      </div>
+
+      <!-- Footer Info -->
+      <div class="text-center text-xs text-gray-400 font-semibold my-2">
+        Hot & Fresh in 10–15 minutes
+      </div>
+
+      <!-- Action Row: [- 1 +] Pill & Add to Order CTA -->
+      <div class="flex items-center gap-3 pt-2">
+        <div class="flex items-center justify-between bg-gray-100 rounded-full px-4 py-2.5 w-32 shrink-0">
+          <button type="button" onclick="changeCustomModalQty(-1)" class="w-6 h-6 rounded-full hover:bg-gray-200 text-gray-700 font-black text-lg flex items-center justify-center leading-none select-none">-</button>
+          <span class="font-black text-base text-gray-900" id="customModalQty">1</span>
+          <button type="button" onclick="changeCustomModalQty(1)" class="w-6 h-6 rounded-full hover:bg-gray-200 text-gray-700 font-black text-lg flex items-center justify-center leading-none select-none">+</button>
+        </div>
+
+        <button type="button" onclick="confirmCustomizedOrder()" class="flex-1 bg-black hover:bg-gray-800 text-white font-extrabold py-3.5 px-6 rounded-full text-sm flex items-center justify-center gap-2 transition shadow-sm">
+          <span>Add to Order</span>
+          <span>•</span>
+          <span id="customModalFinalBtnPrice">₹0</span>
+        </button>
+      </div>
+
+    </div>
+  `;
+
+  modal.classList.remove('hidden');
+  updateCustomModalPrices();
+};
 
 window.closeCustomizeModal = function() {
   const modal = document.getElementById('posCustomizeModal');
