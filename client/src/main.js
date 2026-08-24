@@ -1584,95 +1584,128 @@ window.generateReceiptPDF = function() {
   }
 };
 
-window.posCart = {}; // { itemId: { item, qty } }
+window.posCart = []; // [{ id, name, variant, toppings: [], basePrice, finalPrice, qty }]
 window.cafeMenuItems = [];
 
 window.openNewOrderModal = async function() {
-  window.posCart = {};
+  window.posCart = [];
   
   let modal = document.getElementById('newOrderModal');
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'newOrderModal';
-    modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4';
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 md:p-6';
     document.body.appendChild(modal);
   }
 
   modal.innerHTML = `
-    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-      <!-- Header -->
-      <div class="px-6 py-4 border-b flex items-center justify-between bg-gray-50">
-        <div>
-          <h3 class="text-lg font-bold text-gray-900">Counter POS / New Order</h3>
-          <p class="text-xs text-gray-500">Punch table & walk-in orders directly to KDS</p>
+    <div class="bg-white rounded-2xl w-full max-w-6xl h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <!-- Modal Header -->
+      <div class="px-6 py-3.5 border-b flex items-center justify-between bg-gray-50/80">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-black text-white flex items-center justify-center font-bold text-sm">POS</div>
+          <div>
+            <h3 class="text-base font-bold text-gray-900 leading-tight">Counter POS & Manual Order Punch</h3>
+            <p class="text-xs text-gray-500">Live order creation with custom sizes and toppings</p>
+          </div>
         </div>
-        <button onclick="closeNewOrderModal()" class="text-gray-400 hover:text-gray-600 text-2xl font-bold leading-none">&times;</button>
+        <button onclick="closeNewOrderModal()" class="text-gray-400 hover:text-gray-600 text-2xl font-bold p-1 leading-none">&times;</button>
       </div>
 
-      <!-- Body: Scrollable -->
-      <div class="p-6 overflow-y-auto space-y-4 flex-1">
-        <!-- Customer & Table Metadata -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <label class="text-xs font-semibold text-gray-600">Table / Tag</label>
-            <select id="posTableSelect" class="w-full mt-1 border border-gray-300 rounded-lg p-2 text-sm bg-white focus:ring-2 focus:ring-black">
-              <option value="Table 1">Table 1</option>
-              <option value="Table 2">Table 2</option>
-              <option value="Table 3">Table 3</option>
-              <option value="Table 4">Table 4</option>
-              <option value="Takeaway">Takeaway</option>
-            </select>
+      <!-- Main Split View Body -->
+      <div class="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
+        
+        <!-- LEFT: Menu & Customization Panel (7 cols) -->
+        <div class="lg:col-span-7 border-r flex flex-col h-full bg-gray-50/30 overflow-hidden">
+          <!-- Filter Controls -->
+          <div class="p-4 border-b bg-white flex gap-2">
+            <input type="text" id="posMenuSearch" oninput="filterPosMenu(this.value)" placeholder="Search burgers, fries, momos, pizzas..." class="w-full border border-gray-300 rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-black outline-none">
           </div>
-          <div>
-            <label class="text-xs font-semibold text-gray-600">Customer Name</label>
-            <input type="text" id="posCustomerName" placeholder="Guest" class="w-full mt-1 border border-gray-300 rounded-lg p-2 text-sm">
-          </div>
-          <div>
-            <label class="text-xs font-semibold text-gray-600">Customer Email <span class="text-gray-400 text-[10px] font-normal">(Optional)</span></label>
-            <input type="email" id="posCustomerEmail" placeholder="guest@example.com" class="w-full mt-1 border border-gray-300 rounded-lg p-2 text-sm">
+
+          <!-- Items Grid -->
+          <div id="posMenuContainer" class="p-4 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
+            <div class="col-span-2 text-center py-12 text-sm text-gray-400">Loading catalog...</div>
           </div>
         </div>
 
-        <!-- Menu Search & Item Selector -->
-        <div>
-          <div class="flex items-center justify-between mb-2">
-            <label class="text-xs font-semibold text-gray-700 uppercase tracking-wider">Select Menu Items</label>
-            <input type="text" id="posMenuSearch" oninput="filterPosMenu(this.value)" placeholder="Search menu..." class="border border-gray-300 rounded-lg px-2.5 py-1 text-xs w-48">
+        <!-- RIGHT: Order Metadata & Live Cart (5 cols) -->
+        <div class="lg:col-span-5 flex flex-col h-full bg-white overflow-hidden">
+          <!-- Metadata Inputs -->
+          <div class="p-4 border-b space-y-3 bg-gray-50/50">
+            <div class="grid grid-cols-2 gap-2.5">
+              <div>
+                <label class="text-[11px] font-bold text-gray-600 uppercase">Table / Tag</label>
+                <select id="posTableSelect" class="w-full mt-1 border border-gray-300 rounded-lg p-2 text-sm bg-white font-medium">
+                  <option value="Table 1">Table 1</option>
+                  <option value="Table 2">Table 2</option>
+                  <option value="Table 3">Table 3</option>
+                  <option value="Table 4">Table 4</option>
+                  <option value="Takeaway">Takeaway</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-[11px] font-bold text-gray-600 uppercase">Customer Name</label>
+                <input type="text" id="posCustomerName" placeholder="Walk-in Guest" class="w-full mt-1 border border-gray-300 rounded-lg p-2 text-sm">
+              </div>
+            </div>
+            <div>
+              <label class="text-[11px] font-bold text-gray-600 uppercase">Customer Email <span class="text-gray-400 font-normal lowercase">(optional)</span></label>
+              <input type="email" id="posCustomerEmail" placeholder="guest@example.com" class="w-full mt-1 border border-gray-300 rounded-lg p-2 text-sm">
+            </div>
           </div>
 
-          <div id="posMenuContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto p-1 border rounded-xl bg-gray-50/50">
-            <div class="col-span-2 text-center py-6 text-sm text-gray-400">Loading live menu...</div>
+          <!-- Selected Items Scroll Area -->
+          <div class="p-4 flex-1 overflow-y-auto space-y-2.5" id="posCartList">
+            <div class="text-center py-16 text-gray-400 text-sm">No items added to ticket yet.</div>
+          </div>
+
+          <!-- Price Calculation & Punch Footer -->
+          <div class="p-4 border-t bg-gray-50 space-y-3">
+            <div class="space-y-1.5 text-xs text-gray-600 font-medium">
+              <div class="flex justify-between"><span>Subtotal:</span><span id="posSubtotal">₹0.00</span></div>
+              <div class="flex justify-between"><span>Taxes (5% GST):</span><span id="posTax">₹0.00</span></div>
+              <div class="flex justify-between text-base font-bold text-gray-900 border-t pt-1.5"><span>Total Payable:</span><span id="posGrandTotal">₹0.00</span></div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <button type="button" onclick="closeNewOrderModal()" class="py-2.5 border border-gray-300 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-100 transition">Cancel</button>
+              <button type="button" onclick="submitPosOrder()" class="py-2.5 bg-black hover:bg-gray-800 text-white rounded-xl text-sm font-bold shadow-sm transition">Punch Order</button>
+            </div>
           </div>
         </div>
 
-        <!-- Order Summary & Total -->
-        <div class="bg-gray-50 rounded-xl p-3 border border-gray-200">
-          <div class="flex justify-between items-center text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-            <span>Selected Items (<span id="posTotalQty">0</span>)</span>
-            <span>Total: ₹<span id="posTotalPrice">0.00</span></span>
-          </div>
-          <div id="posSelectedList" class="text-xs text-gray-500 space-y-1 max-h-24 overflow-y-auto">
-            <em>No items selected yet.</em>
-          </div>
-        </div>
       </div>
+    </div>
 
-      <!-- Footer Actions -->
-      <div class="px-6 py-3 border-t bg-gray-50 flex items-center justify-end gap-2">
-        <button type="button" onclick="closeNewOrderModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-100 font-medium transition">
-          Cancel
-        </button>
-        <button type="button" onclick="submitPosOrder()" class="px-5 py-2 bg-black hover:bg-gray-800 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2">
-          <span>Punch Order</span>
-          <span id="posBtnPrice" class="text-xs bg-gray-700 px-2 py-0.5 rounded text-white">₹0</span>
-        </button>
+    <!-- Sub-Modal: Customize Size / Toppings -->
+    <div id="posCustomizeModal" class="fixed inset-0 z-60 hidden flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
+        <div class="flex items-center justify-between border-b pb-2">
+          <div>
+            <h4 class="font-bold text-gray-900" id="customItemTitle">Customize Item</h4>
+            <span class="text-xs text-gray-500 font-semibold" id="customItemBasePrice">Base: ₹0</span>
+          </div>
+          <button onclick="closeCustomizeModal()" class="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+        </div>
+
+        <div id="variantsSection" class="space-y-2">
+          <label class="text-xs font-bold text-gray-600 uppercase tracking-wider">Select Size / Variant</label>
+          <div id="variantsContainer" class="grid grid-cols-2 gap-2"></div>
+        </div>
+
+        <div id="toppingsSection" class="space-y-2">
+          <label class="text-xs font-bold text-gray-600 uppercase tracking-wider">Add-ons & Toppings</label>
+          <div id="toppingsContainer" class="space-y-1.5 max-h-36 overflow-y-auto border rounded-lg p-2 bg-gray-50"></div>
+        </div>
+
+        <div class="border-t pt-3 flex items-center justify-between">
+          <div class="text-sm font-bold text-gray-900">Item Total: <span id="customModalTotal">₹0</span></div>
+          <button type="button" onclick="confirmCustomizedItem()" class="px-5 py-2 bg-black text-white rounded-xl text-sm font-bold hover:bg-gray-800">Add to Ticket</button>
+        </div>
       </div>
     </div>
   `;
 
   modal.classList.remove('hidden');
-
-  // Load Menu items from API or fallback items cache
   await loadPosMenuItems();
 };
 
@@ -1681,7 +1714,7 @@ window.closeNewOrderModal = function() {
   if (modal) modal.classList.add('hidden');
 };
 
-// 2. Fetch live items from backend /menu or /api/menu
+// 3. Load & Render Menu with Rich Variants
 async function loadPosMenuItems() {
   const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
   const token = localStorage.getItem('glitch_admin_token') || localStorage.getItem('token');
@@ -1690,26 +1723,61 @@ async function loadPosMenuItems() {
     const res = await fetch(`${apiBase}/menu`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {}
     });
-
     if (res.ok) {
       const json = await res.json();
       window.cafeMenuItems = json.data || json.items || json || [];
     }
-  } catch (e) {
-    console.warn('Failed to load menu from API, checking local data');
-  }
+  } catch (e) {}
 
-  // Fallback menu items if endpoint is empty
   if (!window.cafeMenuItems || window.cafeMenuItems.length === 0) {
     window.cafeMenuItems = [
-      { id: '1', name: 'Cheese Fries', price: 150, category: 'Fries' },
-      { id: '2', name: 'Piri Piri Fries', price: 110, category: 'Fries' },
-      { id: '3', name: 'Steamed Momo', price: 200, category: 'Momos' },
-      { id: '4', name: 'Cheese Maggi', price: 100, category: 'Maggi' },
-      { id: '5', name: 'Cold Coffee', price: 80, category: 'Beverages' },
-      { id: '6', name: 'Diet Coke', price: 60, category: 'Beverages' },
-      { id: '7', name: 'Red Sauce Pasta', price: 180, category: 'Pasta' },
-      { id: '8', name: 'Margherita Pizza', price: 220, category: 'Pizza' }
+      {
+        id: '1',
+        name: 'Cheese Fries',
+        price: 150,
+        category: 'Fries',
+        variants: [{ name: 'Regular', price: 150 }, { name: 'Large', price: 210 }],
+        toppings: [{ name: 'Extra Cheese Blend', price: 30 }, { name: 'Peri-Peri Dip', price: 20 }, { name: 'Jalapenos', price: 25 }]
+      },
+      {
+        id: '2',
+        name: 'Piri Piri Fries',
+        price: 110,
+        category: 'Fries',
+        variants: [{ name: 'Regular', price: 110 }, { name: 'Large', price: 160 }],
+        toppings: [{ name: 'Cheese Sauce', price: 30 }, { name: 'Mayo Dip', price: 15 }]
+      },
+      {
+        id: '3',
+        name: 'Steamed Momo',
+        price: 200,
+        category: 'Momos',
+        variants: [{ name: '6 Pcs', price: 140 }, { name: '10 Pcs', price: 200 }],
+        toppings: [{ name: 'Extra Schezwan Sauce', price: 20 }, { name: 'Fried Upgrade', price: 30 }]
+      },
+      {
+        id: '4',
+        name: 'Margherita Pizza',
+        price: 220,
+        category: 'Pizza',
+        variants: [{ name: '7" Personal', price: 180 }, { name: '10" Medium', price: 280 }],
+        toppings: [{ name: 'Extra Mozzarella', price: 40 }, { name: 'Olives & Jalapenos', price: 35 }, { name: 'Garlic Crust', price: 25 }]
+      },
+      {
+        id: '5',
+        name: 'Cold Coffee',
+        price: 80,
+        category: 'Beverages',
+        variants: [{ name: 'Regular (300ml)', price: 80 }, { name: 'Large (500ml)', price: 120 }],
+        toppings: [{ name: 'Vanilla Ice Cream Scoop', price: 30 }, { name: 'Hazelnut Syrup', price: 25 }]
+      },
+      {
+        id: '6',
+        name: 'Cheese Maggi',
+        price: 100,
+        category: 'Maggi',
+        toppings: [{ name: 'Double Cheese', price: 30 }, { name: 'Butter Tadka', price: 20 }]
+      }
     ];
   }
 
@@ -1721,23 +1789,34 @@ function renderPosMenuList(items) {
   if (!container) return;
 
   if (items.length === 0) {
-    container.innerHTML = `<div class="col-span-2 text-center py-6 text-sm text-gray-400">No matching items found</div>`;
+    container.innerHTML = `<div class="col-span-2 text-center py-12 text-sm text-gray-400">No matching items found</div>`;
     return;
   }
 
   container.innerHTML = items.map(item => {
+    const hasCustomizations = (item.variants && item.variants.length > 0) || (item.toppings && item.toppings.length > 0);
     const itemId = item._id || item.id || item.name;
-    const qty = window.posCart[itemId]?.qty || 0;
+
     return `
-      <div class="bg-white p-2.5 rounded-lg border border-gray-200 flex items-center justify-between shadow-xs">
+      <div class="bg-white p-3.5 rounded-xl border border-gray-200 shadow-xs hover:border-gray-300 transition flex flex-col justify-between">
         <div>
-          <div class="font-medium text-gray-900 text-sm leading-tight">${item.name}</div>
-          <div class="text-xs text-gray-500 font-semibold">₹${parseFloat(item.price).toFixed(2)}</div>
+          <div class="flex justify-between items-start">
+            <h4 class="font-bold text-gray-900 text-sm">${item.name}</h4>
+            <span class="text-xs font-bold text-gray-800 bg-gray-100 px-2 py-0.5 rounded">₹${item.price}</span>
+          </div>
+          <p class="text-[11px] text-gray-400 font-medium mt-0.5">${item.category || 'Special'}</p>
         </div>
-        <div class="flex items-center gap-1.5">
-          <button type="button" onclick="updatePosItemQty('${itemId}', -1)" class="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs flex items-center justify-center">-</button>
-          <span class="w-5 text-center text-xs font-semibold text-gray-900" id="pos_qty_${itemId}">${qty}</span>
-          <button type="button" onclick="updatePosItemQty('${itemId}', 1)" class="w-6 h-6 rounded bg-black hover:bg-gray-800 text-white font-bold text-xs flex items-center justify-center">+</button>
+
+        <div class="mt-3 flex items-center justify-between pt-2 border-t border-gray-100">
+          ${hasCustomizations ? `
+            <button type="button" onclick="openItemCustomizer('${itemId}')" class="text-xs font-bold text-black bg-gray-100 hover:bg-black hover:text-white px-3 py-1.5 rounded-lg transition">
+              + Customize
+            </button>
+          ` : `
+            <button type="button" onclick="addDirectItem('${itemId}')" class="text-xs font-bold text-white bg-black hover:bg-gray-800 px-3 py-1.5 rounded-lg transition">
+              + Add to Ticket
+            </button>
+          `}
         </div>
       </div>
     `;
@@ -1752,54 +1831,187 @@ window.filterPosMenu = function(query) {
   renderPosMenuList(filtered);
 };
 
-window.updatePosItemQty = function(itemId, delta) {
+// 4. Customization Handler
+let currentCustomizingItem = null;
+let selectedVariant = null;
+let selectedToppings = [];
+
+window.openItemCustomizer = function(itemId) {
   const item = window.cafeMenuItems.find(i => (i._id || i.id || i.name) === itemId);
   if (!item) return;
 
-  if (!window.posCart[itemId]) {
-    window.posCart[itemId] = { item, qty: 0 };
+  currentCustomizingItem = item;
+  selectedVariant = (item.variants && item.variants.length > 0) ? item.variants[0] : null;
+  selectedToppings = [];
+
+  document.getElementById('customItemTitle').innerText = item.name;
+  document.getElementById('customItemBasePrice').innerText = `Base: ₹${item.price}`;
+
+  // Render Variants
+  const varBox = document.getElementById('variantsSection');
+  const varCont = document.getElementById('variantsContainer');
+  if (item.variants && item.variants.length > 0) {
+    varBox.classList.remove('hidden');
+    varCont.innerHTML = item.variants.map((v, idx) => `
+      <label class="flex items-center justify-between p-2.5 border rounded-lg cursor-pointer hover:bg-gray-50 text-xs font-medium ${idx === 0 ? 'border-black bg-gray-50' : 'border-gray-200'}">
+        <input type="radio" name="itemVariantRadio" value="${idx}" onchange="selectPosVariant(${idx})" ${idx === 0 ? 'checked' : ''} class="accent-black mr-2">
+        <span class="flex-1">${v.name}</span>
+        <span class="font-bold">₹${v.price}</span>
+      </label>
+    `).join('');
+  } else {
+    varBox.classList.add('hidden');
   }
 
-  window.posCart[itemId].qty += delta;
-  if (window.posCart[itemId].qty <= 0) {
-    delete window.posCart[itemId];
+  // Render Toppings
+  const topBox = document.getElementById('toppingsSection');
+  const topCont = document.getElementById('toppingsContainer');
+  if (item.toppings && item.toppings.length > 0) {
+    topBox.classList.remove('hidden');
+    topCont.innerHTML = item.toppings.map((t, idx) => `
+      <label class="flex items-center justify-between p-2 rounded hover:bg-white cursor-pointer text-xs">
+        <div class="flex items-center gap-2">
+          <input type="checkbox" onchange="togglePosTopping(${idx}, this.checked)" class="accent-black rounded">
+          <span>${t.name}</span>
+        </div>
+        <span class="font-semibold text-gray-700">+₹${t.price}</span>
+      </label>
+    `).join('');
+  } else {
+    topBox.classList.add('hidden');
   }
 
-  const qtyEl = document.getElementById(`pos_qty_${itemId}`);
-  if (qtyEl) {
-    qtyEl.innerText = window.posCart[itemId]?.qty || 0;
-  }
-
-  updatePosSummary();
+  updateCustomModalTotal();
+  document.getElementById('posCustomizeModal').classList.remove('hidden');
 };
 
-function updatePosSummary() {
-  const cartEntries = Object.values(window.posCart);
-  let totalQty = 0;
-  let totalPrice = 0;
+window.closeCustomizeModal = function() {
+  document.getElementById('posCustomizeModal').classList.add('hidden');
+};
 
-  const listContainer = document.getElementById('posSelectedList');
-  if (cartEntries.length === 0) {
-    listContainer.innerHTML = '<em>No items selected yet.</em>';
-  } else {
-    listContainer.innerHTML = cartEntries.map(({ item, qty }) => {
-      totalQty += qty;
-      const sub = (parseFloat(item.price) || 0) * qty;
-      totalPrice += sub;
-      return `<div class="flex justify-between text-gray-700"><span>${qty}x ${item.name}</span><span>₹${sub.toFixed(2)}</span></div>`;
-    }).join('');
+window.selectPosVariant = function(idx) {
+  if (currentCustomizingItem && currentCustomizingItem.variants) {
+    selectedVariant = currentCustomizingItem.variants[idx];
+    updateCustomModalTotal();
   }
+};
 
-  document.getElementById('posTotalQty').innerText = totalQty;
-  document.getElementById('posTotalPrice').innerText = totalPrice.toFixed(2);
-  document.getElementById('posBtnPrice').innerText = `₹${totalPrice.toFixed(2)}`;
+window.togglePosTopping = function(idx, checked) {
+  if (!currentCustomizingItem || !currentCustomizingItem.toppings) return;
+  const topping = currentCustomizingItem.toppings[idx];
+  if (checked) {
+    selectedToppings.push(topping);
+  } else {
+    selectedToppings = selectedToppings.filter(t => t.name !== topping.name);
+  }
+  updateCustomModalTotal();
+};
+
+function updateCustomModalTotal() {
+  let base = selectedVariant ? selectedVariant.price : (currentCustomizingItem ? currentCustomizingItem.price : 0);
+  let toppingsTotal = selectedToppings.reduce((s, t) => s + (t.price || 0), 0);
+  document.getElementById('customModalTotal').innerText = `₹${(base + toppingsTotal).toFixed(2)}`;
 }
 
-// 3. Submit Payload matching Backend Schema
+window.confirmCustomizedItem = function() {
+  if (!currentCustomizingItem) return;
+
+  const basePrice = selectedVariant ? selectedVariant.price : currentCustomizingItem.price;
+  const toppingsPrice = selectedToppings.reduce((s, t) => s + (t.price || 0), 0);
+  const finalUnitPrice = basePrice + toppingsPrice;
+
+  window.posCart.push({
+    id: currentCustomizingItem._id || currentCustomizingItem.id || currentCustomizingItem.name,
+    name: currentCustomizingItem.name,
+    variant: selectedVariant ? selectedVariant.name : null,
+    toppings: [...selectedToppings],
+    price: finalUnitPrice,
+    category: currentCustomizingItem.category || 'General',
+    qty: 1
+  });
+
+  closeCustomizeModal();
+  renderPosCart();
+};
+
+window.addDirectItem = function(itemId) {
+  const item = window.cafeMenuItems.find(i => (i._id || i.id || i.name) === itemId);
+  if (!item) return;
+
+  const existing = window.posCart.find(c => c.id === itemId && !c.variant && c.toppings.length === 0);
+  if (existing) {
+    existing.qty += 1;
+  } else {
+    window.posCart.push({
+      id: itemId,
+      name: item.name,
+      variant: null,
+      toppings: [],
+      price: item.price,
+      category: item.category || 'General',
+      qty: 1
+    });
+  }
+  renderPosCart();
+};
+
+window.changeCartQty = function(index, delta) {
+  if (!window.posCart[index]) return;
+  window.posCart[index].qty += delta;
+  if (window.posCart[index].qty <= 0) {
+    window.posCart.splice(index, 1);
+  }
+  renderPosCart();
+};
+
+function renderPosCart() {
+  const container = document.getElementById('posCartList');
+  if (!container) return;
+
+  if (window.posCart.length === 0) {
+    container.innerHTML = `<div class="text-center py-16 text-gray-400 text-sm">No items added to ticket yet.</div>`;
+    document.getElementById('posSubtotal').innerText = '₹0.00';
+    document.getElementById('posTax').innerText = '₹0.00';
+    document.getElementById('posGrandTotal').innerText = '₹0.00';
+    return;
+  }
+
+  let subtotal = 0;
+  container.innerHTML = window.posCart.map((c, idx) => {
+    const itemTotal = c.price * c.qty;
+    subtotal += itemTotal;
+
+    return `
+      <div class="p-2.5 rounded-xl border border-gray-200 bg-gray-50/50 flex items-start justify-between">
+        <div class="flex-1 pr-2">
+          <div class="font-bold text-gray-900 text-xs">${c.name}</div>
+          ${c.variant ? `<div class="text-[10px] text-gray-500 font-semibold mt-0.5">Size: ${c.variant}</div>` : ''}
+          ${c.toppings.length > 0 ? `
+            <div class="text-[10px] text-gray-400 mt-0.5">+ ${c.toppings.map(t => t.name).join(', ')}</div>
+          ` : ''}
+          <div class="text-xs font-bold text-gray-800 mt-1">₹${itemTotal.toFixed(2)}</div>
+        </div>
+        <div class="flex items-center gap-1.5 mt-1">
+          <button type="button" onclick="changeCartQty(${idx}, -1)" class="w-6 h-6 rounded bg-white border border-gray-300 hover:bg-gray-100 font-bold text-xs flex items-center justify-center">-</button>
+          <span class="w-4 text-center text-xs font-bold text-gray-900">${c.qty}</span>
+          <button type="button" onclick="changeCartQty(${idx}, 1)" class="w-6 h-6 rounded bg-black text-white hover:bg-gray-800 font-bold text-xs flex items-center justify-center">+</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const tax = subtotal * 0.05;
+  const grandTotal = subtotal + tax;
+
+  document.getElementById('posSubtotal').innerText = `₹${subtotal.toFixed(2)}`;
+  document.getElementById('posTax').innerText = `₹${tax.toFixed(2)}`;
+  document.getElementById('posGrandTotal').innerText = `₹${grandTotal.toFixed(2)}`;
+}
+
+// 5. Submit Complete Order
 window.submitPosOrder = async function() {
-  const cartEntries = Object.values(window.posCart);
-  if (cartEntries.length === 0) {
-    if (typeof showToast === 'function') showToast('Please select at least 1 menu item', 'error');
+  if (window.posCart.length === 0) {
+    if (typeof showToast === 'function') showToast('Ticket is empty! Add items first', 'error');
     return;
   }
 
@@ -1807,21 +2019,32 @@ window.submitPosOrder = async function() {
   const customerName = document.getElementById('posCustomerName')?.value?.trim() || 'Walk-in Guest';
   const customerEmail = document.getElementById('posCustomerEmail')?.value?.trim() || '';
 
-  const items = cartEntries.map(({ item, qty }) => ({
-    name: item.name,
-    price: parseFloat(item.price) || 0,
-    quantity: qty,
-    category: item.category || 'General'
-  }));
+  const items = window.posCart.map(c => {
+    let customLabel = c.name;
+    if (c.variant) customLabel += ` (${c.variant})`;
+    if (c.toppings && c.toppings.length > 0) {
+      customLabel += ` [Toppings: ${c.toppings.map(t => t.name).join(', ')}]`;
+    }
+    return {
+      name: customLabel,
+      price: c.price,
+      quantity: c.qty,
+      category: c.category || 'General'
+    };
+  });
 
-  const total = items.reduce((acc, curr) => acc + (curr.price * curr.quantity), 0);
+  const subtotal = items.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+  const tax = subtotal * 0.05;
+  const grandTotal = subtotal + tax;
 
   const payload = {
     table,
     customerName,
     ...(customerEmail ? { customerEmail, email: customerEmail } : {}),
     items,
-    total,
+    tax,
+    taxes: tax,
+    total: grandTotal,
     status: 'Preparing',
     orderStatus: 'PREPARING',
     paymentStatus: 'UNPAID',
@@ -1842,15 +2065,15 @@ window.submitPosOrder = async function() {
     });
 
     if (res.ok) {
-      if (typeof showToast === 'function') showToast('Counter order punched successfully!', 'success');
+      if (typeof showToast === 'function') showToast('Order punched to Kitchen successfully!', 'success');
       closeNewOrderModal();
       if (typeof fetchAllOrders === 'function') fetchAllOrders();
     } else {
       const err = await res.json().catch(() => ({}));
       if (typeof showToast === 'function') showToast(err.message || 'Failed to create order', 'error');
     }
-  } catch (e) {
-    console.error('Order creation error:', e);
-    if (typeof showToast === 'function') showToast('Network error punching order', 'error');
+  } catch (err) {
+    console.error('POS submit error:', err);
+    if (typeof showToast === 'function') showToast('Network error creating order', 'error');
   }
 };
