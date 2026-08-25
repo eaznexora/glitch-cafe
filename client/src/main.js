@@ -654,10 +654,18 @@ function renderMasterOrders(orders) {
       if (order.status === 'PENDING') openIncomingOrderModal(order._id);
       else openOrderDrawer(order._id);
     };
+
+    const custName = order.customerName || order.customer?.name || 'Walk-in Guest';
+    const custEmail = order.customerEmail || order.customer?.email || '';
+
     tr.innerHTML = `
       <td class="px-6 py-4 align-top">
         <div class="font-bold text-sm text-monochrome-900 group-hover:underline">${order.orderNumber}</div>
         <div class="text-xs text-gray-500 mt-1">${timestamp}</div>
+      </td>
+      <td class="px-6 py-4 align-top">
+        <div class="font-extrabold text-gray-900 text-sm leading-tight">${custName}</div>
+        ${custEmail ? `<div class="text-[11px] text-gray-400 font-medium">${custEmail}</div>` : ''}
       </td>
       <td class="px-6 py-4 align-top">
         <span class="inline-block px-2 py-1 bg-gray-100 text-monochrome-900 font-bold text-xs rounded border border-gray-200">Table ${tableNumber}</span>
