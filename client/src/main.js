@@ -2165,29 +2165,35 @@ window.submitPosOrder = async function() {
 
   const tableSelect = document.getElementById('posTableSelect');
   const tableVal = tableSelect ? tableSelect.value : 'Table 1';
-  // Parse numeric table if backend expects a number, otherwise keep string
   const tableNumber = parseInt(tableVal.replace(/\\D/g, '')) || 1;
 
   const customerName = document.getElementById('posCustomerName')?.value?.trim() || 'Walk-in Guest';
   const customerEmail = document.getElementById('posCustomerEmail')?.value?.trim() || '';
 
-  // Format items matching customer.js / backend order schema
-  const formattedItems = window.posCart.map(item => ({
-    id: item.id || item._id || item.productId,
-    productId: item.productId || item.id || item._id,
-    name: item.name,
-    price: parseFloat(item.price || item.unitPrice || 0),
-    quantity: parseInt(item.quantity || item.qty || 1),
-    size: item.size || item.variant || '',
-    toppings: Array.isArray(item.toppings) 
-      ? item.toppings.map(t => typeof t === 'string' ? t : (t.name || ''))
-      : [],
-    itemTotal: parseFloat(item.price || 0) * parseInt(item.quantity || item.qty || 1)
-  }));
+  // Format items with strict subtotal mapping matching Mongoose schema
+  const formattedItems = window.posCart.map(item => {
+    const qty = parseInt(item.quantity || item.qty || 1);
+    const unitPrice = parseFloat(item.price || item.unitPrice || 0);
+    const itemSubtotal = unitPrice * qty;
 
-  const subtotal = formattedItems.reduce((acc, curr) => acc + curr.itemTotal, 0);
-  const tax = subtotal * 0.05;
-  const total = subtotal + tax;
+    return {
+      id: item.id || item._id || item.productId,
+      productId: item.productId || item.id || item._id,
+      name: item.name,
+      price: unitPrice,
+      quantity: qty,
+      size: item.size || item.variant || '',
+      toppings: Array.isArray(item.toppings) 
+        ? item.toppings.map(t => typeof t === 'string' ? t : (t.name || ''))
+        : [],
+      subtotal: itemSubtotal,
+      itemTotal: itemSubtotal
+    };
+  });
+
+  const orderSubtotal = formattedItems.reduce((acc, curr) => acc + curr.subtotal, 0);
+  const tax = orderSubtotal * 0.05;
+  const grandTotal = orderSubtotal + tax;
 
   const payload = {
     table: tableVal,
@@ -2195,16 +2201,15 @@ window.submitPosOrder = async function() {
     customerName: customerName,
     customerEmail: customerEmail,
     items: formattedItems,
-    subtotal: subtotal,
+    subtotal: orderSubtotal,
     tax: tax,
-    total: total,
-    totalAmount: total,
+    total: grandTotal,
+    totalAmount: grandTotal,
     status: 'Preparing',
     orderStatus: 'PREPARING',
     paymentStatus: 'PAID',
     paymentMethod: 'CASH',
-    orderType: tableVal.toLowerCase().includes('takeaway') ? 'Takeaway' : 'Dine-In',
-    createdAt: new Date().toISOString()
+    orderType: tableVal.toLowerCase().includes('takeaway') ? 'Takeaway' : 'Dine-In'
   };
 
   const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
@@ -2223,14 +2228,12 @@ window.submitPosOrder = async function() {
     if (res.ok) {
       if (typeof showToast === 'function') showToast('Order punched successfully!', 'success');
       closeNewOrderModal();
-      
-      // Redirect to orders / KDS screen
       window.location.href = './orders.html';
     } else {
       const errData = await res.json().catch(() => ({}));
       console.error('Server rejection:', errData);
       if (typeof showToast === 'function') {
-        showToast(errData.message || 'Failed to create order. Check payload.', 'error');
+        showToast(errData.error || errData.message || 'Failed to create order', 'error');
       }
     }
   } catch (err) {
