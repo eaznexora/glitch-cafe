@@ -132,14 +132,30 @@ window.filterUsersTable = function() {
 };
 
 window.exportCustomersToCSV = function() {
-  if (!allCustomers || allCustomers.length === 0) return;
+  if (!allCustomers || allCustomers.length === 0) {
+    if (typeof showToast === 'function') showToast('No customer data to export', 'error');
+    return;
+  }
   
-  let csv = 'Customer Name,Email,Total Orders,Total Spent (INR),Last Active Date\n';
-  allCustomers.forEach(c => {
-    csv += `"${c.name}","${c.email}",${c.totalOrders},${c.totalSpent.toFixed(2)},"${new Date(c.lastActive).toLocaleDateString()}"\n`;
+  // 1. Clean headers
+  const headers = ['Customer Name', 'Email / Contact', 'Total Orders', 'Total Spent (INR)', 'Last Active Date'];
+  
+  // 2. Format rows safely
+  const rows = allCustomers.map(c => {
+    const cleanName = (c.name || 'Walk-in Guest').replace(/"/g, '""');
+    const cleanEmail = (c.email && c.email !== '—' && c.email !== 'N/A') ? c.email.replace(/"/g, '""') : 'N/A';
+    const totalOrders = parseInt(c.totalOrders || 0, 10);
+    const totalSpent = Number(parseFloat(c.totalSpent || 0).toFixed(2));
+    const lastActive = c.lastActive ? new Date(c.lastActive).toISOString().slice(0, 10) : '';
+
+    return `"${cleanName}","${cleanEmail}",${totalOrders},${totalSpent},"${lastActive}"`;
   });
 
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  // 3. Prepend UTF-8 BOM (\uFEFF) for Excel compatibility
+  const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+
+  // 4. Trigger clean download
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.setAttribute('href', url);
@@ -147,6 +163,7 @@ window.exportCustomersToCSV = function() {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 };
 
 document.addEventListener('DOMContentLoaded', loadCustomerDirectory);
