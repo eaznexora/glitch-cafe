@@ -156,7 +156,8 @@ window.exportCustomersToCSV = function() {
       }
     }
 
-    return `"${cleanName}","${cleanEmail}",${totalOrders},"${totalSpent}","${lastActiveStr}"`;
+    // Use Excel formula syntax `="value"` to force plain text and avoid ###### overflow
+    return `"${cleanName}","${cleanEmail}",${totalOrders},="${totalSpent}","${lastActiveStr}"`;
   });
 
   // Prepend UTF-8 BOM (\uFEFF) for Excel compatibility
