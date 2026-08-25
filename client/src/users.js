@@ -113,12 +113,12 @@ function renderUsersTable(customers) {
   }
 
   tbody.innerHTML = customers.map(c => `
-    <tr class="border-b border-gray-100 hover:bg-gray-50/80 transition">
-      <td class="py-4 px-6 font-extrabold text-gray-900">${c.name}</td>
-      <td class="py-4 px-6 text-gray-500 font-medium">${c.email}</td>
-      <td class="py-4 px-6 font-bold text-gray-900">${c.totalOrders}</td>
-      <td class="py-4 px-6 font-black text-gray-900">₹${c.totalSpent.toFixed(2)}</td>
-      <td class="py-4 px-6 text-gray-400 font-medium">${new Date(c.lastActive).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+    <tr class="hover:bg-gray-50 transition-colors cursor-pointer">
+      <td class="py-4 px-6 font-bold text-monochrome-900">${c.name}</td>
+      <td class="py-4 px-6 text-gray-500">${c.email}</td>
+      <td class="py-4 px-6 font-medium text-monochrome-900">${c.totalOrders}</td>
+      <td class="py-4 px-6 font-bold text-monochrome-900">₹${c.totalSpent.toFixed(2)}</td>
+      <td class="py-4 px-6 text-gray-500">${new Date(c.lastActive).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
     </tr>
   `).join('');
 }
