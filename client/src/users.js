@@ -2,68 +2,105 @@ let allCustomers = [];
 
 async function loadCustomerDirectory() {
   const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
-  const token = localStorage.getItem('glitch_admin_token') || localStorage.getItem('token');
   
+  // Exhaustive token key probe
+  const token = localStorage.getItem('token') || 
+                localStorage.getItem('adminToken') || 
+                localStorage.getItem('glitch_admin_token') || 
+                localStorage.getItem('glitch_auth_token') ||
+                sessionStorage.getItem('token') ||
+                sessionStorage.getItem('adminToken');
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+  }
+
   try {
-    const res = await fetch(`${apiBase}/orders`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
-    });
+    const res = await fetch(`${apiBase}/orders`, { headers });
+    
+    if (res.status === 401) {
+      console.warn('Unauthorized on /api/orders. Attempting cached storage fallback...');
+      const cached = localStorage.getItem('cached_orders') || localStorage.getItem('glitch_orders');
+      if (cached) {
+        processCustomerOrders(JSON.parse(cached));
+        return;
+      }
+    }
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
     const data = await res.json();
     const orders = data.data || data.orders || (Array.isArray(data) ? data : []);
-
-    const customerMap = {};
-    const today = new Date().toISOString().slice(0, 10);
-
-    orders.forEach(order => {
-      const name = (order.customerName || order.customer?.name || 'Walk-in Guest').trim();
-      const email = (order.customerEmail || order.customer?.email || '').trim();
-      const key = (email || name).toLowerCase();
-
-      const orderDate = order.createdAt ? new Date(order.createdAt) : new Date();
-      const orderDateStr = orderDate.toISOString().slice(0, 10);
-      const amount = parseFloat(order.total || order.totalAmount || 0);
-
-      if (!customerMap[key]) {
-        customerMap[key] = {
-          name: name,
-          email: email || 'N/A',
-          totalOrders: 0,
-          totalSpent: 0,
-          firstSeen: orderDate,
-          lastActive: orderDate,
-          isNewToday: orderDateStr === today
-        };
-      }
-
-      customerMap[key].totalOrders += 1;
-      customerMap[key].totalSpent += amount;
-      if (orderDate > customerMap[key].lastActive) {
-        customerMap[key].lastActive = orderDate;
-      }
-      if (orderDate < customerMap[key].firstSeen) {
-        customerMap[key].firstSeen = orderDate;
-      }
-    });
-
-    allCustomers = Object.values(customerMap);
-    calculateUserKPIs(allCustomers, orders);
-    renderUsersTable(allCustomers);
+    
+    // Cache for resilience
+    localStorage.setItem('cached_orders', JSON.stringify(orders));
+    processCustomerOrders(orders);
   } catch (err) {
     console.error('Failed to load user directory:', err);
+    const cached = localStorage.getItem('cached_orders') || localStorage.getItem('glitch_orders');
+    if (cached) {
+      try { processCustomerOrders(JSON.parse(cached)); } catch(e){}
+    }
   }
 }
 
-function calculateUserKPIs(customers, orders) {
+function processCustomerOrders(orders) {
+  const customerMap = {};
+  const today = new Date().toISOString().slice(0, 10);
+
+  orders.forEach(order => {
+    const name = (order.customerName || order.customer?.name || 'Walk-in Guest').trim();
+    const email = (order.customerEmail || order.customer?.email || '').trim();
+    const key = (email || name).toLowerCase();
+
+    const orderDate = order.createdAt ? new Date(order.createdAt) : new Date();
+    const orderDateStr = orderDate.toISOString().slice(0, 10);
+    const amount = parseFloat(order.total || order.totalAmount || order.subtotal || 0);
+
+    if (!customerMap[key]) {
+      customerMap[key] = {
+        name: name,
+        email: email || '—',
+        totalOrders: 0,
+        totalSpent: 0,
+        firstSeen: orderDate,
+        lastActive: orderDate,
+        isNewToday: orderDateStr === today
+      };
+    }
+
+    customerMap[key].totalOrders += 1;
+    customerMap[key].totalSpent += amount;
+    if (orderDate > customerMap[key].lastActive) {
+      customerMap[key].lastActive = orderDate;
+    }
+    if (orderDate < customerMap[key].firstSeen) {
+      customerMap[key].firstSeen = orderDate;
+    }
+  });
+
+  allCustomers = Object.values(customerMap);
+  calculateUserKPIs(allCustomers);
+  renderUsersTable(allCustomers);
+}
+
+function calculateUserKPIs(customers) {
   const total = customers.length;
   const newToday = customers.filter(c => c.isNewToday).length;
   const repeats = customers.filter(c => c.totalOrders > 1).length;
   const repeatRate = total > 0 ? Math.round((repeats / total) * 100) : 0;
   const totalRev = customers.reduce((acc, c) => acc + c.totalSpent, 0);
 
-  document.getElementById('statTotalUsers').innerText = total;
-  document.getElementById('statNewToday').innerText = newToday;
-  document.getElementById('statRepeatRate').innerText = `${repeatRate}%`;
-  document.getElementById('statTotalRev').innerText = `₹${totalRev.toFixed(2)}`;
+  const elTotal = document.getElementById('statTotalUsers');
+  const elNew = document.getElementById('statNewToday');
+  const elRepeat = document.getElementById('statRepeatRate');
+  const elRev = document.getElementById('statTotalRev');
+
+  if (elTotal) elTotal.innerText = total;
+  if (elNew) elNew.innerText = newToday;
+  if (elRepeat) elRepeat.innerText = `${repeatRate}%`;
+  if (elRev) elRev.innerText = `₹${totalRev.toFixed(0)}`;
 }
 
 function renderUsersTable(customers) {
@@ -71,17 +108,17 @@ function renderUsersTable(customers) {
   if (!tbody) return;
 
   if (customers.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-12 text-gray-400">No customer records found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-16 text-gray-400 font-medium">No customer records found.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = customers.map(c => `
-    <tr class="hover:bg-gray-50/80 transition">
-      <td class="py-3.5 px-6 font-extrabold text-gray-900">${c.name}</td>
-      <td class="py-3.5 px-6 text-gray-500">${c.email}</td>
-      <td class="py-3.5 px-6 font-bold text-gray-900">${c.totalOrders}</td>
-      <td class="py-3.5 px-6 font-black text-gray-900">₹${c.totalSpent.toFixed(2)}</td>
-      <td class="py-3.5 px-6 text-gray-400">${new Date(c.lastActive).toLocaleDateString()}</td>
+    <tr class="border-b border-gray-100 hover:bg-gray-50/80 transition">
+      <td class="py-4 px-6 font-extrabold text-gray-900">${c.name}</td>
+      <td class="py-4 px-6 text-gray-500 font-medium">${c.email}</td>
+      <td class="py-4 px-6 font-bold text-gray-900">${c.totalOrders}</td>
+      <td class="py-4 px-6 font-black text-gray-900">₹${c.totalSpent.toFixed(2)}</td>
+      <td class="py-4 px-6 text-gray-400 font-medium">${new Date(c.lastActive).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
     </tr>
   `).join('');
 }
@@ -97,7 +134,7 @@ window.filterUsersTable = function() {
 window.exportCustomersToCSV = function() {
   if (!allCustomers || allCustomers.length === 0) return;
   
-  let csv = 'Customer Name,Email,Total Orders,Total Spent (INR),Last Active\n';
+  let csv = 'Customer Name,Email,Total Orders,Total Spent (INR),Last Active Date\n';
   allCustomers.forEach(c => {
     csv += `"${c.name}","${c.email}",${c.totalOrders},${c.totalSpent.toFixed(2)},"${new Date(c.lastActive).toLocaleDateString()}"\n`;
   });
