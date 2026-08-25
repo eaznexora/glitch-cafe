@@ -1688,12 +1688,14 @@ window.openNewOrderModal = async function() {
     </div>
     
     <!-- CUSTOMIZATION MODAL (Customer Mirror) -->
-    <div id="pos-customization-backdrop" class="fixed inset-0 z-[60] backdrop-blur-md bg-black/40 opacity-0 transition-opacity duration-300 ease-out hidden" onclick="closePosCustomizationModal()"></div>
-    
-    <!-- Slide up modal -->
-    <div id="pos-customization-modal" class="fixed bottom-0 left-0 right-0 lg:left-1/2 lg:-translate-x-1/2 lg:w-[450px] max-w-md mx-auto bg-white rounded-t-[32px] p-6 shadow-2xl z-[70] transition-transform duration-300 ease-out translate-y-full flex flex-col max-h-[85vh]">
+    <div id="pos-customization-backdrop" class="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150 hidden" onclick="closePosCustomizationModal()">
       
-      <div id="pos-modal-drag-handle" class="w-14 h-1 bg-neutral-300 rounded-full mx-auto mb-5 cursor-pointer shrink-0" onclick="closePosCustomizationModal()"></div>
+      <!-- Centered popup modal -->
+      <div id="pos-customization-modal" class="max-w-md w-full rounded-3xl bg-white p-6 shadow-2xl relative flex flex-col max-h-[85vh]" onclick="event.stopPropagation()">
+        
+        <button type="button" class="absolute top-4 right-4 text-gray-400 hover:text-black transition z-10" onclick="closePosCustomizationModal()">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
       
       <div class="flex-1 overflow-y-auto no-scrollbar pb-6">
         <!-- Dynamic Item Info -->
@@ -1988,18 +1990,15 @@ window.openPosCustomizationModal = function(itemId) {
   document.getElementById('pos-modal-qty').innerText = window.posModalQuantity;
   updatePosModalPrice();
 
-  backdrop.style.display = 'block';
-  setTimeout(() => backdrop.classList.remove('opacity-0'), 10);
-  modal.style.transform = 'translateY(0%)';
+  backdrop.classList.remove('hidden');
+  backdrop.style.display = 'flex';
 };
 
 window.closePosCustomizationModal = function() {
   const backdrop = document.getElementById('pos-customization-backdrop');
-  const modal = document.getElementById('pos-customization-modal');
-  if (backdrop && modal) {
-    modal.style.transform = 'translateY(100%)';
-    backdrop.classList.add('opacity-0');
-    setTimeout(() => { backdrop.style.display = 'none'; }, 300);
+  if (backdrop) {
+    backdrop.classList.add('hidden');
+    backdrop.style.display = 'none';
   }
 };
 
@@ -2159,45 +2158,53 @@ window.renderPosCartList = () => {
 
 // 5. Submit Complete Order
 window.submitPosOrder = async function() {
-  if (window.posCart.length === 0) {
-    if (typeof showToast === 'function') showToast('Ticket is empty! Add items first', 'error');
+  if (!window.posCart || window.posCart.length === 0) {
+    if (typeof showToast === 'function') showToast('Ticket is empty! Add items first.', 'error');
     return;
   }
 
-  const table = document.getElementById('posTableSelect')?.value || 'Table 1';
+  const tableSelect = document.getElementById('posTableSelect');
+  const tableVal = tableSelect ? tableSelect.value : 'Table 1';
+  // Parse numeric table if backend expects a number, otherwise keep string
+  const tableNumber = parseInt(tableVal.replace(/\\D/g, '')) || 1;
+
   const customerName = document.getElementById('posCustomerName')?.value?.trim() || 'Walk-in Guest';
   const customerEmail = document.getElementById('posCustomerEmail')?.value?.trim() || '';
 
-  const items = window.posCart.map(c => {
-    let customLabel = c.name;
-    if (c.size) customLabel += ` (${c.size})`;
-    if (c.toppings && c.toppings.length > 0) {
-      customLabel += ` [Toppings: ${c.toppings.join(', ')}]`;
-    }
-    return {
-      name: customLabel,
-      price: c.price,
-      quantity: c.quantity,
-      category: c.category || 'General'
-    };
-  });
+  // Format items matching customer.js / backend order schema
+  const formattedItems = window.posCart.map(item => ({
+    id: item.id || item._id || item.productId,
+    productId: item.productId || item.id || item._id,
+    name: item.name,
+    price: parseFloat(item.price || item.unitPrice || 0),
+    quantity: parseInt(item.quantity || item.qty || 1),
+    size: item.size || item.variant || '',
+    toppings: Array.isArray(item.toppings) 
+      ? item.toppings.map(t => typeof t === 'string' ? t : (t.name || ''))
+      : [],
+    itemTotal: parseFloat(item.price || 0) * parseInt(item.quantity || item.qty || 1)
+  }));
 
-  const subtotal = items.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+  const subtotal = formattedItems.reduce((acc, curr) => acc + curr.itemTotal, 0);
   const tax = subtotal * 0.05;
-  const grandTotal = subtotal + tax;
+  const total = subtotal + tax;
 
   const payload = {
-    table,
-    customerName,
-    ...(customerEmail ? { customerEmail, email: customerEmail } : {}),
-    items,
-    tax,
-    taxes: tax,
-    total: grandTotal,
+    table: tableVal,
+    tableNumber: tableNumber,
+    customerName: customerName,
+    customerEmail: customerEmail,
+    items: formattedItems,
+    subtotal: subtotal,
+    tax: tax,
+    total: total,
+    totalAmount: total,
     status: 'Preparing',
     orderStatus: 'PREPARING',
-    paymentStatus: 'UNPAID',
-    paymentMethod: 'PENDING'
+    paymentStatus: 'PAID',
+    paymentMethod: 'CASH',
+    orderType: tableVal.toLowerCase().includes('takeaway') ? 'Takeaway' : 'Dine-In',
+    createdAt: new Date().toISOString()
   };
 
   const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
@@ -2214,16 +2221,20 @@ window.submitPosOrder = async function() {
     });
 
     if (res.ok) {
-      if (typeof showToast === 'function') showToast('Order punched to Kitchen successfully!', 'success');
-      window.posCart = [];
+      if (typeof showToast === 'function') showToast('Order punched successfully!', 'success');
       closeNewOrderModal();
-      if (typeof fetchAllOrders === 'function') fetchAllOrders();
+      
+      // Redirect to orders / KDS screen
+      window.location.href = './orders.html';
     } else {
-      const err = await res.json().catch(() => ({}));
-      if (typeof showToast === 'function') showToast(err.message || 'Failed to create order', 'error');
+      const errData = await res.json().catch(() => ({}));
+      console.error('Server rejection:', errData);
+      if (typeof showToast === 'function') {
+        showToast(errData.message || 'Failed to create order. Check payload.', 'error');
+      }
     }
   } catch (err) {
-    console.error('POS submit error:', err);
+    console.error('Network/POS error:', err);
     if (typeof showToast === 'function') showToast('Network error creating order', 'error');
   }
 };
