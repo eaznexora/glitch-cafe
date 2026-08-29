@@ -20,12 +20,8 @@ async function loadCustomerDirectory() {
     const res = await fetch(`${apiBase}/orders`, { headers });
     
     if (res.status === 401) {
-      console.warn('Unauthorized on /api/orders. Attempting cached storage fallback...');
-      const cached = localStorage.getItem('cached_orders') || localStorage.getItem('glitch_orders');
-      if (cached) {
-        processCustomerOrders(JSON.parse(cached));
-        return;
-      }
+      console.warn('Unauthorized on /api/orders.');
+      return;
     }
 
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -38,10 +34,6 @@ async function loadCustomerDirectory() {
     processCustomerOrders(orders);
   } catch (err) {
     console.error('Failed to load user directory:', err);
-    const cached = localStorage.getItem('cached_orders') || localStorage.getItem('glitch_orders');
-    if (cached) {
-      try { processCustomerOrders(JSON.parse(cached)); } catch(e){}
-    }
   }
 }
 
