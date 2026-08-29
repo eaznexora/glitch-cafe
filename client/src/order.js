@@ -4,6 +4,26 @@ let masterProducts = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
   initURLParams();
+  
+  const activeOrderId = localStorage.getItem('active_order_id');
+  let glitchActiveStr = localStorage.getItem('glitch_active_order');
+  let glitchActive = null;
+  if (glitchActiveStr) {
+    try { glitchActive = JSON.parse(glitchActiveStr); } catch (e) {}
+  }
+  
+  if (activeOrderId || glitchActive) {
+    const status = glitchActive ? glitchActive.status?.toUpperCase() : '';
+    if (['COMPLETED', 'REJECTED', 'CANCELLED'].includes(status)) {
+      localStorage.removeItem('active_order_id');
+      localStorage.removeItem('active_order_table');
+      localStorage.removeItem('glitch_active_order');
+    } else {
+      window.location.href = window.BASE_PATH + '/track-order.html' + window.location.search;
+      return;
+    }
+  }
+  
   setOrderGreeting();
   await fetchProducts(); // Fetch products first so renderCart has toppings data
   loadCart();
@@ -285,7 +305,10 @@ async function submitOrderPayload(customer) {
     
     if (res.ok) {
       const createdOrder = await res.json();
-      // Store active order but do NOT clear cart yet
+      
+      localStorage.setItem('active_order_id', createdOrder._id);
+      localStorage.setItem('active_order_table', cleanTable);
+      
       const noteInput = document.getElementById('order-note');
       localStorage.setItem('glitch_active_order', JSON.stringify({
         orderId: createdOrder._id,
@@ -295,17 +318,11 @@ async function submitOrderPayload(customer) {
         totals: { totalAmount }
       }));
       
-      // Morph button to Waiting state
-      btn.className = 'w-full bg-neutral-900 text-white font-semibold py-4 px-6 rounded-2xl flex items-center justify-center gap-3 cursor-not-allowed';
-      btn.innerHTML = `
-        <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <span>Accepting your order...</span>
-      `;
+      localStorage.removeItem('glitch_cart');
+      localStorage.removeItem('cart');
+      cart = [];
       
-      startOrderPolling(createdOrder._id);
+      window.location.href = window.BASE_PATH + '/track-order.html' + window.location.search;
     } else {
       const err = await res.json();
       showToast(`Error placing order: ${err.error || 'Unknown error'}`, 'error');
@@ -319,42 +336,7 @@ async function submitOrderPayload(customer) {
   }
 }
 
-function startOrderPolling(orderId) {
-  const btn = document.getElementById('btn-place-order');
-  
-  const pollInterval = setInterval(async () => {
-    try {
-      const res = await fetch(`${window.API_BASE}/orders/${orderId}/status`);
-      if (res.ok) {
-        const order = await res.json();
-        const status = order.status.toUpperCase();
-        
-        if (['ACCEPTED', 'PREPARING'].includes(status)) {
-          clearInterval(pollInterval);
-          
-          btn.className = 'w-full bg-emerald-600 text-white font-semibold py-4 px-6 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20';
-          btn.innerHTML = `<span>Order Accepted ✓</span>`;
-          
-          localStorage.removeItem('glitch_cart');
-          if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-          
-          setTimeout(() => {
-            window.location.href = window.BASE_PATH + '/customer.html' + window.location.search;
-          }, 2000);
-        } else if (['REJECTED', 'CANCELLED'].includes(status)) {
-          clearInterval(pollInterval);
-          
-          btn.className = 'w-full bg-red-600 text-white font-semibold py-4 px-6 rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed';
-          btn.innerHTML = `<span>Order Declined ✕</span>`;
-          
-          showToast('Your order could not be accepted by the kitchen.', 'error');
-        }
-      }
-    } catch (err) {
-      console.error('Polling error', err);
-    }
-  }, 2500);
-}
+
 
 // Checkout Auth Logic
 let currentAuthEmail = '';

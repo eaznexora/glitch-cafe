@@ -161,54 +161,74 @@ function renderStatusBadge(status) {
   container.innerHTML = badgeHtml;
 }
 
-function startPolling() {
-  if (pollInterval) clearInterval(pollInterval);
-  
+async function fetchActiveOrderStatus() {
+  if (!activeOrderSession || !activeOrderSession.orderId) return;
   const orderId = activeOrderSession.orderId;
   
-  pollInterval = setInterval(async () => {
-    try {
-      const res = await fetch(`${window.API_BASE}/orders/${orderId}/status`);
-      if (res.ok) {
-        const order = await res.json();
-        
-        // Handle partial items rejection (update status of items)
-        let needsUpdate = false;
-        
-        if (order.items && order.items.length > 0) {
-          order.items.forEach((remoteItem, idx) => {
-            if (activeOrderSession.items[idx] && activeOrderSession.items[idx].status !== remoteItem.status) {
-              needsUpdate = true;
-            }
-          });
-          
-          if (needsUpdate || order.totalAmount !== activeOrderSession.totals?.totalAmount) {
-            activeOrderSession.items = order.items;
-            activeOrderSession.totals = { totalAmount: order.totalAmount };
-            localStorage.setItem('glitch_active_order', JSON.stringify(activeOrderSession));
-            renderOrderDetails();
+  try {
+    const res = await fetch(`${window.API_BASE}/orders/${orderId}/status`);
+    if (res.ok) {
+      const order = await res.json();
+      
+      // Handle partial items rejection (update status of items)
+      let needsUpdate = false;
+      
+      if (order.items && order.items.length > 0) {
+        order.items.forEach((remoteItem, idx) => {
+          if (activeOrderSession.items[idx] && activeOrderSession.items[idx].status !== remoteItem.status) {
+            needsUpdate = true;
           }
-        }
+        });
         
-        // Handle Status Change
-        if (order.status !== activeOrderSession.status) {
-          activeOrderSession.status = order.status;
+        if (needsUpdate || order.totalAmount !== activeOrderSession.totals?.totalAmount) {
+          activeOrderSession.items = order.items;
+          activeOrderSession.totals = { totalAmount: order.totalAmount };
           localStorage.setItem('glitch_active_order', JSON.stringify(activeOrderSession));
-          renderStatusBadge(order.status);
-          
-          if (['ACCEPTED', 'PREPARING', 'READY_TO_SERVE'].includes(order.status.toUpperCase())) {
-            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-          } else if (['REJECTED', 'CANCELLED', 'COMPLETED'].includes(order.status.toUpperCase())) {
-            clearInterval(pollInterval);
-            if (['COMPLETED'].includes(order.status.toUpperCase())) {
-               // Remove active session on completion so they can order again fully fresh next time
-               localStorage.removeItem('glitch_active_order');
-            }
-          }
+          renderOrderDetails();
         }
       }
-    } catch (err) {
-      console.error('Polling error', err);
+      
+      // Handle Status Change
+      if (order.status !== activeOrderSession.status) {
+        activeOrderSession.status = order.status;
+        localStorage.setItem('glitch_active_order', JSON.stringify(activeOrderSession));
+        renderStatusBadge(order.status);
+        
+        if (['ACCEPTED', 'PREPARING', 'READY_TO_SERVE'].includes(order.status.toUpperCase())) {
+          if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+        } else if (['REJECTED', 'CANCELLED', 'COMPLETED'].includes(order.status.toUpperCase())) {
+          if (pollInterval) clearInterval(pollInterval);
+        }
+      }
     }
-  }, 3000);
+  } catch (err) {
+    console.error('Polling error', err);
+  }
+}
+
+function startPolling() {
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(fetchActiveOrderStatus, 3000);
+}
+
+// Ensure Socket.io instance exists (added to track-order.html head)
+if (typeof io !== 'undefined') {
+  const socket = io(window.location.origin, {
+    path: '/THE-GLITCH-CAFE/socket.io',
+    transports: ['websocket', 'polling']
+  });
+
+  socket.on('connect', () => {
+    console.log('🟢 Tracker Socket Connected:', socket.id);
+  });
+
+  const eventNames = ['order:accepted', 'order:rejected', 'order:status_updated'];
+  eventNames.forEach(event => {
+    socket.on(event, (data) => {
+      if (activeOrderSession && data.orderId === activeOrderSession.orderId) {
+        console.log(`Socket event ${event} received for active order. Fetching latest status...`);
+        fetchActiveOrderStatus();
+      }
+    });
+  });
 }
