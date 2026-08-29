@@ -1,0 +1,663 @@
+const fs = require('fs');
+
+const posBlock = \`
+// POS Globals
+window.posCart = []; // [{ id, name, size, toppings: [], quantity, price, subtotal }]
+window.posMenuItems = [];
+window.posCategories = [];
+window.posModalItemId = null;
+window.posModalSelectedSize = null;
+window.posModalSelectedToppings = [];
+window.posModalQuantity = 1;
+window.posIsManualScrolling = false;
+
+window.openNewOrderModal = async function() {
+  window.posCart = window.posCart || [];
+  
+  let modal = document.getElementById('newOrderModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'newOrderModal';
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 md:p-6';
+    document.body.appendChild(modal);
+  }
+
+  // Exact Customer CSS applied inline to avoid affecting other elements
+  modal.innerHTML = \\\`
+    <div class="bg-[#FAFAFA] rounded-3xl w-full max-w-6xl h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-[#000000] font-sans">
+      <!-- Header -->
+      <div class="px-6 py-4 border-b flex items-center justify-between bg-white shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-black text-white flex items-center justify-center font-black text-sm tracking-wide">POS</div>
+          <div>
+            <h3 class="text-base font-extrabold text-gray-900 leading-tight">Counter POS & Manual Order Punch</h3>
+            <p class="text-xs text-gray-400 font-medium">Customer-synced live menu</p>
+          </div>
+        </div>
+        <button onclick="closeNewOrderModal()" class="text-gray-400 hover:text-gray-900 text-2xl font-bold p-1 transition">&times;</button>
+      </div>
+
+      <!-- Main Body Split -->
+      <div class="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden bg-[#fbfbfa]">
+        
+        <!-- LEFT: Customer Storefront Mirror (7 cols) -->
+        <div class="lg:col-span-7 border-r border-gray-100 flex flex-col h-full bg-[#fbfbfa] overflow-hidden relative" id="pos-left-scroll-container">
+          
+          <!-- Sticky Category Bar -->
+          <div id="pos-category-tabs-wrapper" class="sticky top-0 z-40 bg-[#fbfbfa] py-3 px-4 border-b border-gray-100 shadow-sm w-full shrink-0">
+            <div id="pos-category-bar" class="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth pb-1">
+              <!-- Dynamic category pills injected by JS -->
+            </div>
+          </div>
+
+          <!-- Menu Container -->
+          <div class="flex-1 overflow-y-auto px-5 py-4 space-y-6" id="pos-menu-container">
+            <div class="text-center py-16 text-sm text-gray-400 font-medium">Loading live menu...</div>
+          </div>
+        </div>
+
+        <!-- RIGHT: Order Ticket & Checkout (5 cols) -->
+        <div class="lg:col-span-5 flex flex-col h-full bg-white overflow-hidden">
+          <!-- Order Header Inputs -->
+          <div class="p-4 border-b border-gray-100 space-y-3 bg-gray-50/40 shrink-0">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Table / Tag</label>
+                <select id="posTableSelect" class="w-full mt-1 border border-gray-200 rounded-xl p-2 text-sm bg-white font-semibold text-gray-900 focus:ring-2 focus:ring-black outline-none">
+                  <option value="Table 1">Table 1</option>
+                  <option value="Table 2">Table 2</option>
+                  <option value="Table 3">Table 3</option>
+                  <option value="Table 4">Table 4</option>
+                  <option value="Takeaway">Takeaway</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Customer Name</label>
+                <input type="text" id="posCustomerName" placeholder="Walk-in Guest" class="w-full mt-1 border border-gray-200 rounded-xl p-2 text-sm bg-white font-semibold text-gray-900 focus:ring-2 focus:ring-black outline-none">
+              </div>
+            </div>
+            <div>
+              <label class="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Customer Email <span class="text-gray-400 font-normal lowercase">(optional)</span></label>
+              <input type="email" id="posCustomerEmail" placeholder="guest@example.com" class="w-full mt-1 border border-gray-200 rounded-xl p-2 text-sm bg-white focus:ring-2 focus:ring-black outline-none">
+            </div>
+          </div>
+
+          <!-- Cart List -->
+          <div class="p-4 flex-1 overflow-y-auto space-y-4" id="posCartList">
+            <div class="text-center py-20 text-gray-400 text-sm font-medium">Your cart is empty</div>
+          </div>
+
+          <!-- Summary & Punch CTA -->
+          <div class="p-5 border-t border-gray-100 bg-white shrink-0">
+            <div class="flex justify-between items-center mb-4">
+              <span class="text-gray-600 font-medium">Subtotal</span>
+              <span id="pos-cart-subtotal-display" class="font-bold text-lg">₹0</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <button type="button" onclick="closeNewOrderModal()" class="py-3.5 border border-gray-300 rounded-2xl text-sm font-bold text-gray-700 hover:bg-gray-100 transition">Cancel</button>
+              <button type="button" onclick="submitPosOrder()" class="py-3.5 bg-black hover:bg-neutral-900 text-white rounded-2xl text-sm font-bold shadow-xl active:scale-[0.98] transition">Punch Order</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    
+    <!-- CUSTOMIZATION MODAL (Customer Mirror) -->
+    <div id="pos-customization-backdrop" class="fixed inset-0 z-[60] backdrop-blur-md bg-white/10 opacity-0 transition-opacity duration-300 ease-out hidden" onclick="closePosCustomizationModal()"></div>
+    
+    <!-- Slide up modal -->
+    <div id="pos-customization-modal" class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] p-6 shadow-2xl z-[70] transition-transform duration-300 ease-out translate-y-full flex flex-col max-h-[85vh]">
+      
+      <div id="pos-modal-drag-handle" class="w-14 h-1 bg-neutral-300 rounded-full mx-auto mb-5 cursor-pointer shrink-0" onclick="closePosCustomizationModal()"></div>
+      
+      <div class="flex-1 overflow-y-auto no-scrollbar pb-6">
+        <!-- Dynamic Item Info -->
+        <div id="pos-modal-special-tag-container">
+          <div id="pos-modal-special-tag" class="hidden bg-black text-white text-[11px] font-semibold tracking-wider px-3 py-1 rounded-md uppercase inline-flex items-center gap-1 mb-2">
+            ✦ THE GLITCH SPECIAL ✦
+          </div>
+        </div>
+        
+        <div class="flex items-center justify-between">
+          <div class="flex items-center">
+            <h3 id="pos-modal-item-name" class="text-xl font-extrabold text-black">Item Name</h3>
+            <div id="pos-modal-veg-indicator" class="inline-flex items-center justify-center w-4 h-4 border-[1.5px] rounded-[3px] p-[2px] ml-2">
+              <div class="w-2 h-2 rounded-full"></div>
+            </div>
+          </div>
+          <span id="pos-modal-item-price" class="text-xl font-extrabold text-black">₹0</span>
+        </div>
+  
+        <hr class="border-neutral-100 my-4">
+
+        <!-- Sizes Container -->
+        <div id="pos-sizes-section-wrapper">
+          <p class="text-sm font-semibold text-neutral-800 mb-3">Select Size</p>
+          <div id="pos-modal-sizes" class="grid grid-cols-3 gap-2.5 mb-4"></div>
+        </div>
+  
+        <hr id="pos-sizes-divider" class="border-neutral-100 my-4">
+
+        <!-- Toppings Container -->
+        <div id="pos-toppings-section-wrapper">
+          <p class="text-sm font-semibold text-neutral-800 mb-3">Select Toppings</p>
+          <div id="pos-modal-toppings" class="grid grid-cols-2 gap-x-4 gap-y-3 mb-4"></div>
+        </div>
+  
+        <hr class="border-neutral-100 my-4">
+
+        <p class="text-center text-[11px] text-neutral-500 mb-3">Hot & Fresh in 10–15 minutes</p>
+        <div class="flex items-center gap-3">
+          <div class="flex items-center justify-between bg-neutral-100 text-black rounded-2xl h-[52px] px-3 w-[120px] shrink-0 border border-neutral-200">
+            <button class="flex-1 h-full flex items-center justify-center text-2xl font-medium hover:text-gray-500 transition-colors pb-1" onclick="updatePosModalQty(-1)">-</button>
+            <span id="pos-modal-qty" class="w-8 text-center text-base font-bold">1</span>
+            <button class="flex-1 h-full flex items-center justify-center text-2xl font-medium hover:text-gray-500 transition-colors pb-1" onclick="updatePosModalQty(1)">+</button>
+          </div>
+          <button id="pos-modal-add-to-order-btn" class="flex-1 bg-black text-white font-bold text-base h-[52px] rounded-2xl active:scale-[0.98] transition" onclick="addPosCustomizedItem()">
+            Add to Order
+          </button>
+        </div>
+      </div>
+    </div>
+  \\\`;
+
+  modal.classList.remove('hidden');
+  await loadPosMenuItems();
+  
+  if (window.posCart.length > 0) {
+    renderPosCartList();
+  }
+};
+
+window.closeNewOrderModal = function() {
+  const modal = document.getElementById('newOrderModal');
+  if (modal) modal.classList.add('hidden');
+};
+
+async function loadPosMenuItems() {
+  const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
+  
+  try {
+    const [catRes, prodRes] = await Promise.all([
+      fetch(\\\`\\\${apiBase}/categories\\\`),
+      fetch(\\\`\\\${apiBase}/products\\\`)
+    ]);
+    if (catRes.ok && prodRes.ok) {
+      const catsData = await catRes.json();
+      const prodsData = await prodRes.json();
+      
+      window.posCategories = catsData.sort((a, b) => (Number(a.displayOrder) || 999) - (Number(b.displayOrder) || 999));
+      window.posMenuItems = prodsData.sort((a, b) => (Number(a.displayOrder) || 999) - (Number(b.displayOrder) || 999));
+      
+      renderPosCategories();
+      renderPosCatalog();
+    } else {
+      document.getElementById('pos-menu-container').innerHTML = '<div class="text-center py-12 text-gray-500">Failed to load menu.</div>';
+    }
+  } catch (err) {
+    console.error('POS menu fetch err:', err);
+    document.getElementById('pos-menu-container').innerHTML = '<div class="text-center py-12 text-gray-500">Failed to load menu.</div>';
+  }
+}
+
+function renderPosCategories() {
+  const bar = document.getElementById('pos-category-bar');
+  if (!bar) return;
+  bar.innerHTML = '';
+  
+  const allBtn = document.createElement('button');
+  allBtn.className = \\\`px-5 py-1.5 rounded-md border border-gray-400 text-[#000000] bg-white whitespace-nowrap text-[13px] font-bold transition-colors pos-cat-pill bg-black text-white border-black\\\`;
+  allBtn.innerText = 'All Items';
+  allBtn.dataset.target = 'top';
+  allBtn.onclick = (e) => scrollToPosCategory('top', e.target);
+  bar.appendChild(allBtn);
+  
+  window.posCategories.forEach(cat => {
+    const btn = document.createElement('button');
+    btn.className = \\\`px-5 py-1.5 rounded-md border border-gray-400 text-[#000000] bg-white whitespace-nowrap text-[13px] font-bold transition-colors pos-cat-pill\\\`;
+    btn.innerText = cat.name;
+    const catSlug = cat.slug || cat.name.replace(/\\s+/g, '-');
+    btn.dataset.target = \\\`pos-cat-section-\\\${catSlug}\\\`;
+    btn.onclick = (e) => scrollToPosCategory(btn.dataset.target, e.target);
+    bar.appendChild(btn);
+  });
+}
+
+function scrollToPosCategory(targetId, btn) {
+  window.posIsManualScrolling = true;
+  
+  document.querySelectorAll('.pos-cat-pill').forEach(p => {
+    p.classList.remove('bg-black', 'text-white', 'border-black');
+    p.classList.add('bg-white', 'text-[#000000]', 'border-gray-400');
+  });
+  
+  if (btn) {
+    btn.classList.remove('bg-white', 'text-[#000000]', 'border-gray-400');
+    btn.classList.add('bg-black', 'text-white', 'border-black');
+    btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }
+  
+  const scrollContainer = document.getElementById('pos-left-scroll-container');
+  if (targetId === 'top') {
+    scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+  } else {
+    const targetElement = document.getElementById(targetId);
+    if (targetElement) {
+      const containerTop = scrollContainer.getBoundingClientRect().top;
+      const targetTop = targetElement.getBoundingClientRect().top;
+      const offset = targetTop - containerTop + scrollContainer.scrollTop - 70;
+      scrollContainer.scrollTo({ top: offset, behavior: 'smooth' });
+    }
+  }
+  
+  setTimeout(() => {
+    window.posIsManualScrolling = false;
+  }, 800);
+}
+
+function renderPosCatalog() {
+  const container = document.getElementById('pos-menu-container');
+  if (!container) return;
+  container.innerHTML = '';
+  
+  window.posCategories.forEach(cat => {
+    const itemsInCat = window.posMenuItems.filter(p => 
+      p.categoryId === cat._id || 
+      (p.categoryId && p.categoryId._id === cat._id) ||
+      p.categorySlug === cat.slug
+    );
+    
+    let catHTML = \\\`
+      <div id="pos-cat-section-\\\${cat.slug || cat.name.replace(/\\s+/g, '-')}" class="bg-white rounded-[20px] pt-6 pb-3 px-3 mb-6 shadow-sm border border-gray-100 scroll-mt-24">
+        <h2 class="text-[20px] font-bold tracking-widest uppercase text-[#000000] text-center mb-3">\\\${cat.name}</h2>
+        <hr class="border-gray-200 mb-4 mx-2">
+    \\\`;
+    
+    if (itemsInCat.length === 0) {
+      catHTML += \\\`<div class="text-xs text-gray-400 py-3 italic text-center">No items available in this category yet.</div>\\\`;
+    } else {
+      itemsInCat.forEach(item => {
+        const iconHTML = item.isVeg 
+          ? \\\`<span class="inline-flex items-center justify-center w-4 h-4 border-2 border-green-600 rounded-sm bg-white shrink-0"><span class="w-1.5 h-1.5 bg-green-600 rounded-full"></span></span>\\\` 
+          : \\\`<span class="inline-flex items-center justify-center w-4 h-4 border-2 border-red-700 rounded-sm bg-white shrink-0"><span style="width:0;height:0;border-left:3px solid transparent;border-right:3px solid transparent;border-bottom:5px solid #b91c1c;"></span></span>\\\`;
+        
+        const badgeHTML = item.isSpecial 
+          ? \\\`<div class="bg-black text-white text-sm font-semibold px-4 py-1.5 rounded-md uppercase tracking-wider text-center w-full mb-3">✦ THE GLITCH SPECIAL ✦</div>\\\` 
+          : '';
+        
+        let actionHTML = '';
+        if (!item.isAvailable) {
+          actionHTML = \\\`<button class="bg-[#A3A3A3] text-white px-4 py-1.5 rounded-lg text-sm font-semibold cursor-not-allowed min-w-[76px]">86'd</button>\\\`;
+        } else {
+          const qty = window.posCart.filter(c => c.id === item._id).reduce((sum, c) => sum + c.quantity, 0);
+          if (qty > 0) {
+            actionHTML = \\\`
+              <div class="flex items-center bg-black text-white rounded-lg h-[32px] overflow-hidden shadow-sm min-w-[76px]">
+                <button type="button" class="flex-1 h-full flex items-center justify-center hover:bg-gray-800 transition text-lg leading-none" onclick="openPosCustomizationModal('\\\${item._id}')">-</button>
+                <span class="w-6 text-center text-sm font-bold leading-none">\\\${qty}</span>
+                <button type="button" class="flex-1 h-full flex items-center justify-center hover:bg-gray-800 transition text-lg leading-none" onclick="openPosCustomizationModal('\\\${item._id}')">+</button>
+              </div>
+            \\\`;
+          } else {
+            actionHTML = \\\`<button type="button" class="bg-black text-white px-4 py-1.5 rounded-lg text-sm font-semibold cursor-pointer min-w-[76px]" onclick="openPosCustomizationModal('\\\${item._id}')">+ Add</button>\\\`;
+          }
+        }
+        
+        catHTML += \\\`
+          <div class="bg-[#FFFFFF] rounded-[15px] p-4 border border-[#EAEAEA] mb-3 relative \\\${!item.isAvailable ? 'opacity-60' : ''}">
+            \\\${badgeHTML}
+            <div>
+              <div class="flex justify-between items-start">
+                <div class="flex-1 pr-3 flex items-start">
+                  <h3 class="font-bold text-[#000000] leading-tight text-[17px]">\\\${item.name}</h3>
+                  <div class="ml-2 shrink-0">\\\${iconHTML}</div>
+                </div>
+                <div class="shrink-0 flex items-center gap-3">
+                  <div class="font-bold text-sm text-[#000000]">₹\\\${item.price}</div>
+                  <div>\\\${actionHTML}</div>
+                </div>
+              </div>
+              \\\${item.description ? \\\`<hr class="border-gray-200 mt-3 mb-2"><p class="text-[11px] text-gray-500 font-normal leading-relaxed line-clamp-2 pr-12">\\\${item.description}</p>\\\` : ''}
+            </div>
+          </div>
+        \\\`;
+      });
+    }
+    catHTML += \\\`</div>\\\`;
+    container.innerHTML += catHTML;
+  });
+}
+
+window.openPosCustomizationModal = function(itemId) {
+  let item = window.posMenuItems.find(i => i._id === itemId);
+  if (!item) return;
+  
+  window.posModalItemId = itemId;
+  window.posModalSelectedSize = item.sizes && item.sizes.length > 0 ? 0 : null;
+  window.posModalSelectedToppings = [];
+  window.posModalQuantity = 1;
+  
+  const backdrop = document.getElementById('pos-customization-backdrop');
+  const modal = document.getElementById('pos-customization-modal');
+
+  document.getElementById('pos-modal-item-name').innerText = item.name;
+  document.getElementById('pos-modal-item-price').innerText = \\\`₹\\\${item.price}\\\`;
+  
+  const specialTag = document.getElementById('pos-modal-special-tag');
+  if (item.isSpecial) specialTag.classList.remove('hidden');
+  else specialTag.classList.add('hidden');
+
+  const vegIndicator = document.getElementById('pos-modal-veg-indicator');
+  if (item.isVeg) {
+    vegIndicator.className = 'inline-flex items-center justify-center w-4 h-4 border-[1.5px] border-emerald-600 rounded-[3px] p-[2px] ml-2';
+    vegIndicator.innerHTML = '<div class="w-2 h-2 bg-emerald-600 rounded-full"></div>';
+  } else {
+    vegIndicator.className = 'inline-flex items-center justify-center w-4 h-4 border-[1.5px] border-red-700 rounded-[3px] p-[2px] ml-2';
+    vegIndicator.innerHTML = '<div style="width:0;height:0;border-left:3px solid transparent;border-right:3px solid transparent;border-bottom:5px solid #b91c1c;"></div>';
+  }
+
+  const sizeContainer = document.getElementById('pos-modal-sizes');
+  const sizeWrapper = document.getElementById('pos-sizes-section-wrapper');
+  const sizeDivider = document.getElementById('pos-sizes-divider');
+  if (item.sizes && item.sizes.length > 0) {
+    sizeWrapper.style.display = 'block';
+    if (sizeDivider) sizeDivider.style.display = 'block';
+    sizeContainer.innerHTML = item.sizes.map((size, index) => {
+      const isSelected = index === window.posModalSelectedSize;
+      const basePrice = Number(item.price) || 0;
+      const sizePrice = basePrice + Number(size.price || 0);
+      return \\\`
+        <div class="pos-size-btn \\\${isSelected ? 'bg-black text-white shadow-sm' : 'bg-white border border-neutral-400 text-neutral-900 hover:border-black'} p-3 rounded-xl text-center flex flex-col justify-center items-center cursor-pointer" onclick="selectPosSize(\\\${index})">
+          <span class="font-bold text-sm leading-tight">\\\${size.name}</span>
+          <span class="font-bold text-sm mt-0.5">₹\\\${sizePrice}</span>
+        </div>
+      \\\`;
+    }).join('');
+  } else {
+    sizeWrapper.style.display = 'none';
+    if (sizeDivider) sizeDivider.style.display = 'none';
+    sizeContainer.innerHTML = '';
+  }
+
+  const toppingContainer = document.getElementById('pos-modal-toppings');
+  const toppingWrapper = document.getElementById('pos-toppings-section-wrapper');
+  if (item.toppings && item.toppings.length > 0) {
+    toppingWrapper.style.display = 'block';
+    toppingContainer.innerHTML = item.toppings.map((top, index) => {
+      const isChecked = window.posModalSelectedToppings.includes(index);
+      return \\\`
+        <label class="flex items-center justify-between cursor-pointer">
+          <div class="flex items-center gap-2">
+            <input type="checkbox" class="w-4 h-4 rounded border-neutral-400 text-black focus:ring-0 accent-black" \\\${isChecked ? 'checked' : ''} onchange="togglePosTopping(\\\${index})">
+            <span class="text-xs font-medium text-neutral-800">\\\${top.name}</span>
+          </div>
+          <span class="text-xs font-semibold text-neutral-900">₹\\\${Number(top.price || 0)}</span>
+        </label>
+      \\\`;
+    }).join('');
+  } else {
+    toppingWrapper.style.display = 'none';
+    toppingContainer.innerHTML = '';
+  }
+  
+  document.getElementById('pos-modal-qty').innerText = window.posModalQuantity;
+  updatePosModalPrice();
+
+  backdrop.style.display = 'block';
+  setTimeout(() => backdrop.classList.remove('opacity-0'), 10);
+  modal.style.transform = 'translateY(0%)';
+};
+
+window.closePosCustomizationModal = function() {
+  const backdrop = document.getElementById('pos-customization-backdrop');
+  const modal = document.getElementById('pos-customization-modal');
+  if (backdrop && modal) {
+    modal.style.transform = 'translateY(100%)';
+    backdrop.classList.add('opacity-0');
+    setTimeout(() => { backdrop.style.display = 'none'; }, 300);
+  }
+};
+
+window.selectPosSize = (index) => {
+  window.posModalSelectedSize = index;
+  const item = window.posMenuItems.find(i => i._id === window.posModalItemId);
+  if (item && item.sizes) {
+    const sizeBtns = document.querySelectorAll('.pos-size-btn');
+    sizeBtns.forEach((btn, idx) => {
+      if (idx === index) {
+        btn.className = 'pos-size-btn bg-black text-white shadow-sm p-3 rounded-xl text-center flex flex-col justify-center items-center cursor-pointer';
+      } else {
+        btn.className = 'pos-size-btn bg-white border border-neutral-400 text-neutral-900 hover:border-black p-3 rounded-xl text-center flex flex-col justify-center items-center cursor-pointer';
+      }
+    });
+  }
+  updatePosModalPrice();
+};
+
+window.togglePosTopping = (index) => {
+  const topIdx = window.posModalSelectedToppings.indexOf(index);
+  if (topIdx > -1) window.posModalSelectedToppings.splice(topIdx, 1);
+  else window.posModalSelectedToppings.push(index);
+  updatePosModalPrice();
+};
+
+window.updatePosModalQty = (change) => {
+  window.posModalQuantity += change;
+  if (window.posModalQuantity < 1) window.posModalQuantity = 1;
+  document.getElementById('pos-modal-qty').innerText = window.posModalQuantity;
+  updatePosModalPrice();
+};
+
+window.updatePosModalPrice = () => {
+  const item = window.posMenuItems.find(i => i._id === window.posModalItemId);
+  if (!item) return;
+  let total = Number(item.price) || 0;
+  if (window.posModalSelectedSize !== null && item.sizes && item.sizes[window.posModalSelectedSize]) {
+    total += Number(item.sizes[window.posModalSelectedSize].price || 0);
+  }
+  if (item.toppings) {
+    window.posModalSelectedToppings.forEach(idx => {
+      total += Number(item.toppings[idx].price || 0);
+    });
+  }
+  const finalPrice = total * window.posModalQuantity;
+  document.getElementById('pos-modal-add-to-order-btn').innerText = \\\`Add to Order • ₹\\\${finalPrice}\\\`;
+};
+
+window.addPosCustomizedItem = () => {
+  const item = window.posMenuItems.find(i => i._id === window.posModalItemId);
+  if (!item) return;
+
+  let unitPrice = Number(item.price) || 0;
+  let sizeName = null;
+  let selectedToppingNames = [];
+
+  if (window.posModalSelectedSize !== null && item.sizes && item.sizes[window.posModalSelectedSize]) {
+    unitPrice += Number(item.sizes[window.posModalSelectedSize].price || 0);
+    sizeName = item.sizes[window.posModalSelectedSize].name;
+  }
+
+  if (item.toppings) {
+    window.posModalSelectedToppings.forEach(idx => {
+      unitPrice += Number(item.toppings[idx].price || 0);
+      selectedToppingNames.push(item.toppings[idx].name);
+    });
+  }
+
+  const subtotal = unitPrice * window.posModalQuantity;
+
+  const existingIdx = window.posCart.findIndex(c => 
+    c.id === item._id && 
+    c.size === sizeName && 
+    JSON.stringify(c.toppings) === JSON.stringify(selectedToppingNames)
+  );
+
+  if (existingIdx > -1) {
+    window.posCart[existingIdx].quantity += window.posModalQuantity;
+    window.posCart[existingIdx].subtotal = window.posCart[existingIdx].quantity * window.posCart[existingIdx].price;
+  } else {
+    window.posCart.push({
+      id: item._id,
+      name: item.name,
+      category: item.category || item.categoryName || 'General',
+      size: sizeName,
+      toppings: selectedToppingNames,
+      quantity: window.posModalQuantity,
+      price: unitPrice,
+      subtotal: subtotal
+    });
+  }
+
+  closePosCustomizationModal();
+  renderPosCartList();
+  renderPosCatalog();
+};
+
+window.changePosCartQty = (index, delta) => {
+  if (!window.posCart[index]) return;
+  window.posCart[index].quantity += delta;
+  if (window.posCart[index].quantity <= 0) {
+    window.posCart.splice(index, 1);
+  } else {
+    window.posCart[index].subtotal = window.posCart[index].quantity * window.posCart[index].price;
+  }
+  renderPosCartList();
+  renderPosCatalog();
+};
+
+window.renderPosCartList = () => {
+  const container = document.getElementById('posCartList');
+  const subtotalDisplay = document.getElementById('pos-cart-subtotal-display');
+  if (!container) return;
+
+  if (window.posCart.length === 0) {
+    container.innerHTML = '<div class="text-center py-20 text-gray-400 text-sm font-medium">Your cart is empty</div>';
+    if (subtotalDisplay) subtotalDisplay.innerText = '₹0';
+    return;
+  }
+
+  let html = '';
+  let subtotal = 0;
+
+  window.posCart.forEach((item, index) => {
+    subtotal += item.subtotal;
+    let details = [];
+    if (item.size) details.push(\\\`Size: \\\${item.size}\\\`);
+    if (item.toppings && item.toppings.length) details.push(\\\`Toppings: \\\${item.toppings.join(', ')}\\\`);
+    
+    const detailsStr = details.length ? \\\`<p class="text-xs text-gray-500 mt-1">\\\${details.join(' | ')}</p>\\\` : '';
+    
+    html += \\\`
+      <div class="flex justify-between items-start border-b border-gray-100 pb-3">
+        <div class="flex-1 pr-4">
+          <div class="flex items-center">
+            <h4 class="font-bold text-sm text-gray-900">\\\${item.name}</h4>
+          </div>
+          \\\${detailsStr}
+          <div class="font-bold text-sm mt-1 text-gray-700">₹\\\${item.price} x \\\${item.quantity}</div>
+        </div>
+        <div class="flex flex-col items-end shrink-0">
+          <div class="font-bold text-gray-900 mb-2">₹\\\${item.subtotal}</div>
+          <div class="flex items-center bg-gray-100 rounded border border-gray-200">
+            <button class="w-7 h-7 flex items-center justify-center font-black hover:bg-gray-200 transition" onclick="changePosCartQty(\\\${index}, -1)">-</button>
+            <span class="w-6 text-center text-xs font-bold">\\\${item.quantity}</span>
+            <button class="w-7 h-7 flex items-center justify-center font-black hover:bg-gray-200 transition" onclick="changePosCartQty(\\\${index}, 1)">+</button>
+          </div>
+        </div>
+      </div>
+    \\\`;
+  });
+
+  container.innerHTML = html;
+  if (subtotalDisplay) subtotalDisplay.innerText = \\\`₹\\\${subtotal}\\\`;
+};
+
+// 5. Submit Complete Order
+window.submitPosOrder = async function() {
+  if (window.posCart.length === 0) {
+    if (typeof showToast === 'function') showToast('Ticket is empty! Add items first', 'error');
+    return;
+  }
+
+  const table = document.getElementById('posTableSelect')?.value || 'Table 1';
+  const customerName = document.getElementById('posCustomerName')?.value?.trim() || 'Walk-in Guest';
+  const customerEmail = document.getElementById('posCustomerEmail')?.value?.trim() || '';
+
+  const items = window.posCart.map(c => {
+    let customLabel = c.name;
+    if (c.size) customLabel += \\\` (\\\${c.size})\\\`;
+    if (c.toppings && c.toppings.length > 0) {
+      customLabel += \\\` [Toppings: \\\${c.toppings.join(', ')}]\\\`;
+    }
+    return {
+      name: customLabel,
+      price: c.price,
+      quantity: c.quantity,
+      category: c.category || 'General'
+    };
+  });
+
+  const subtotal = items.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+  const tax = subtotal * 0.05;
+  const grandTotal = subtotal + tax;
+
+  const payload = {
+    table,
+    customerName,
+    ...(customerEmail ? { customerEmail, email: customerEmail } : {}),
+    items,
+    tax,
+    taxes: tax,
+    total: grandTotal,
+    status: 'Preparing',
+    orderStatus: 'PREPARING',
+    paymentStatus: 'UNPAID',
+    paymentMethod: 'PENDING'
+  };
+
+  const apiBase = window.API_BASE || (window.location.pathname.startsWith('/THE-GLITCH-CAFE') ? '/THE-GLITCH-CAFE/api' : '/api');
+  const token = localStorage.getItem('glitch_admin_token') || localStorage.getItem('token');
+
+  try {
+    const res = await fetch(\\\`\\\${apiBase}/orders\\\`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: \\\`Bearer \\\${token}\\\` } : {})
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      if (typeof showToast === 'function') showToast('Order punched to Kitchen successfully!', 'success');
+      window.posCart = [];
+      closeNewOrderModal();
+      if (typeof fetchAllOrders === 'function') fetchAllOrders();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      if (typeof showToast === 'function') showToast(err.message || 'Failed to create order', 'error');
+    }
+  } catch (err) {
+    console.error('POS submit error:', err);
+    if (typeof showToast === 'function') showToast('Network error creating order', 'error');
+  }
+};
+\`;
+
+let mainCode = fs.readFileSync('client/src/main.js', 'utf8');
+
+const startIndex = mainCode.indexOf('window.posCart = ');
+const endMarker = '// 5. Submit Complete Order';
+const endMarkerIndex = mainCode.indexOf(endMarker);
+if (startIndex !== -1 && endMarkerIndex !== -1) {
+  const endIndex = mainCode.indexOf('};', endMarkerIndex) + 2;
+  
+  mainCode = mainCode.substring(0, startIndex) + posBlock + mainCode.substring(endIndex);
+  
+  fs.writeFileSync('client/src/main.js', mainCode);
+  console.log("Successfully replaced the block!");
+} else {
+  console.log("Could not find start or end index.");
+  process.exit(1);
+}

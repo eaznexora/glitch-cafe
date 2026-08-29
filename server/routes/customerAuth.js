@@ -24,7 +24,7 @@ router.post('/request-otp', async (req, res) => {
     );
 
     await resend.emails.send({
-      from: process.env.EMAIL_FROM || 'The Glitch Cafe <orders@eazsocial.online>',
+      from: process.env.EMAIL_FROM || 'The Glitch Cafe <orders@eaznexora.com>',
       to: email,
       subject: 'Welcome to The Glitch Cafe',
       html: `

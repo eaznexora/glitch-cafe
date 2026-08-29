@@ -24,7 +24,7 @@ router.post('/login', async (req, res) => {
     await user.save();
 
     await resend.emails.send({
-      from: process.env.EMAIL_FROM || 'The Glitch Cafe <orders@eazsocial.online>',
+      from: process.env.EMAIL_FROM || 'The Glitch Cafe <orders@eaznexora.com>',
       to: email,
       subject: 'Your Login Verification Code - The Glitch Cafe',
       html: `
@@ -71,7 +71,7 @@ router.post('/resend-otp', async (req, res) => {
     await user.save();
 
     await resend.emails.send({
-      from: process.env.EMAIL_FROM || 'The Glitch Cafe <orders@eazsocial.online>',
+      from: process.env.EMAIL_FROM || 'The Glitch Cafe <orders@eaznexora.com>',
       to: email,
       subject: 'Your Login Verification Code - The Glitch Cafe',
       html: `
