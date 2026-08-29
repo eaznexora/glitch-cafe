@@ -13,14 +13,43 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   
   if (activeOrderId || glitchActive) {
-    const status = glitchActive ? glitchActive.status?.toUpperCase() : '';
+    let status = glitchActive ? glitchActive.status?.toUpperCase() : 'PENDING';
     if (['COMPLETED', 'REJECTED', 'CANCELLED'].includes(status)) {
       localStorage.removeItem('active_order_id');
       localStorage.removeItem('active_order_table');
       localStorage.removeItem('glitch_active_order');
     } else {
-      window.location.href = window.BASE_PATH + '/track-order.html' + window.location.search;
-      return;
+      showActiveOrderBanner(status);
+      
+      // Fetch latest status in background
+      const targetId = activeOrderId || (glitchActive ? glitchActive.orderId : null);
+      if (targetId) {
+        fetch(`${window.API_BASE}/orders/${targetId}/status`)
+          .then(res => res.json())
+          .then(order => {
+             const newStatus = order.status?.toUpperCase();
+             if (['COMPLETED', 'REJECTED', 'CANCELLED'].includes(newStatus)) {
+               localStorage.removeItem('active_order_id');
+               localStorage.removeItem('active_order_table');
+               localStorage.removeItem('glitch_active_order');
+               const banner = document.getElementById('activeOrderFloatingBanner');
+               if (banner) banner.remove();
+             } else {
+               if (glitchActive) {
+                 glitchActive.status = newStatus;
+                 localStorage.setItem('glitch_active_order', JSON.stringify(glitchActive));
+               }
+               const statusSpan = document.getElementById('bannerOrderStatus');
+               if (statusSpan) {
+                 let ds = 'Preparing';
+                 if (newStatus === 'PENDING') ds = 'Awaiting Kitchen';
+                 if (newStatus === 'READY_TO_SERVE') ds = 'Ready to Serve!';
+                 statusSpan.innerText = ds;
+               }
+             }
+          })
+          .catch(err => console.error("Error syncing active order status", err));
+      }
     }
   }
   
@@ -30,6 +59,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderCart();
   initAutoResizeNote();
 });
+
+function showActiveOrderBanner(status) {
+  let displayStatus = 'Preparing';
+  if (status === 'PENDING') displayStatus = 'Awaiting Kitchen';
+  if (status === 'READY_TO_SERVE') displayStatus = 'Ready to Serve!';
+  
+  const banner = document.createElement('div');
+  banner.id = 'activeOrderFloatingBanner';
+  banner.className = 'fixed top-3 left-1/2 -translate-x-1/2 z-40 bg-black text-white px-4 py-2.5 rounded-2xl shadow-xl flex items-center justify-between gap-4 max-w-sm w-[92%] border border-white/10 animate-in slide-in-from-top duration-200';
+  banner.innerHTML = `
+    <div class="flex items-center gap-2 text-xs font-bold">
+      <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+      <span>Order in Kitchen (<span id="bannerOrderStatus">${displayStatus}</span>)</span>
+    </div>
+    <a href="track-order.html${window.location.search}" class="text-xs font-extrabold bg-white text-black px-3 py-1 rounded-xl hover:bg-gray-100 transition shrink-0">
+      View Live ➔
+    </a>
+  `;
+  document.body.appendChild(banner);
+}
 
 function setOrderGreeting() {
   const customerStr = localStorage.getItem('glitch_customer');
